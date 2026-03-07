@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invoice Generator - GM TAILORS</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <style>
+    /* ════════════════════════════════════
+       VOICE ASSISTANT STYLES
+    ════════════════════════════════════ */
+
+    .voice-assistant-btn {
+        position: fixed; bottom: 32px; right: 32px;
+        width: 70px; height: 70px; border-radius: 50%;
+        background: linear-gradient(135deg, #e91e63, #ad1457);
+        border: none; cursor: pointer;
+        box-shadow: 0 6px 24px rgba(233,30,99,0.55);
+        z-index: 9999; display: flex; align-items: center; justify-content: center;
+        transition: transform 0.3s; animation: pulseIdle 3s infinite;
+    }
+    .voice-assistant-btn:hover { transform: scale(1.12); }
+    .voice-assistant-btn svg   { width:32px; height:32px; fill:white; }
+    .voice-assistant-btn.listening { background:linear-gradient(135deg,#f44336,#b71c1c); animation:pulseListen 0.9s infinite; }
+    .voice-assistant-btn.speaking  { background:linear-gradient(135deg,#43a047,#1b5e20); animation:pulseSpeak 0.75s infinite; }
+    @keyframes pulseIdle   { 0%,100%{box-shadow:0 6px 24px rgba(233,30,99,0.55)} 50%{box-shadow:0 6px 38px rgba(233,30,99,0.9)} }
+    @keyframes pulseListen { 0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(244,67,54,0.7)} 50%{transform:scale(1.07);box-shadow:0 0 0 18px rgba(244,67,54,0)} }
+    @keyframes pulseSpeak  { 0%,100%{transform:scale(1)} 50%{transform:scale(1.09)} }
+
+    /* Modal overlay */
+    .voice-modal {
+        display:none; position:fixed; inset:0;
+        background:rgba(0,0,0,0.68); z-index:10000;
+        align-items:center; justify-content:center; padding:20px;
+    }
+    .voice-modal.active { display:flex; }
+
+    /* Panel — BIG */
+    .voice-panel {
+        background:#fff; border-radius:28px;
+        padding:42px 48px 40px;
+        width:100%; max-width:700px;
+        max-height:92vh; overflow-y:auto;
+        box-shadow:0 30px 90px rgba(0,0,0,0.32);
+        border:2px solid #fce4ec;
+        animation:panelIn 0.38s cubic-bezier(0.34,1.56,0.64,1);
+        position:relative;
+    }
+    @keyframes panelIn { from{transform:translateY(60px) scale(0.95);opacity:0} to{transform:translateY(0) scale(1);opacity:1} }
+
+    .voice-close-btn {
+        position:absolute; top:20px; right:20px;
+        width:40px; height:40px; border-radius:50%;
+        background:#f3f4f6; border:none; cursor:pointer;
+        font-size:1.25rem; color:#6b7280;
+        display:flex; align-items:center; justify-content:center;
+        transition:background .2s;
+    }
+    .voice-close-btn:hover { background:#e5e7eb; }
+
+    /* AI Avatar row */
+    .ai-avatar-row {
+        display:flex; align-items:center; gap:20px;
+        padding:20px 24px; margin-bottom:26px;
+        background:linear-gradient(135deg,#fff0f5,#fce4ec);
+        border-radius:20px; border:1.5px solid #f8bbd0;
+    }
+    .ai-avatar {
+        width:76px; height:76px; border-radius:50%; flex-shrink:0;
+        background:linear-gradient(135deg,#e91e63,#880e4f);
+        display:flex; align-items:center; justify-content:center;
+        font-size:2.2rem;
+        box-shadow:0 4px 20px rgba(233,30,99,0.4);
+    }
+    .ai-avatar.speaking-anim { animation:avatarPulse 0.65s ease-in-out infinite; }
+    @keyframes avatarPulse {
+        0%,100%{box-shadow:0 4px 20px rgba(233,30,99,0.35);transform:scale(1)}
+        50%    {box-shadow:0 4px 38px rgba(233,30,99,0.72);transform:scale(1.09)}
+    }
+    .ai-avatar-info { flex:1; }
+    .ai-avatar-name { font-size:1.15rem; font-weight:700; color:#1f2937; display:flex; align-items:center; gap:9px; }
+    .ai-status-dot  { width:11px; height:11px; border-radius:50%; background:#4caf50; animation:dotPulse 2s infinite; }
+    @keyframes dotPulse { 0%,100%{opacity:1} 50%{opacity:0.35} }
+    .ai-avatar-role { font-size:0.88rem; color:#e91e63; font-weight:500; margin-top:4px; }
+    .ai-speaking-bars { display:flex; align-items:center; gap:4px; margin-top:8px; }
+    .ai-speaking-bars.hidden { display:none; }
+    .ai-speaking-bars .sbar { width:4px; background:#e91e63; border-radius:2px; animation:sbarWave 1s ease-in-out infinite; }
+    .sbar:nth-child(1){height:6px; animation-delay:0s}
+    .sbar:nth-child(2){height:14px;animation-delay:.15s}
+    .sbar:nth-child(3){height:22px;animation-delay:.3s}
+    .sbar:nth-child(4){height:14px;animation-delay:.45s}
+    .sbar:nth-child(5){height:6px; animation-delay:.6s}
+    @keyframes sbarWave { 0%,100%{transform:scaleY(0.4);opacity:0.5} 50%{transform:scaleY(1);opacity:1} }
+
+    /* Progress */
+    .voice-progress { display:flex; gap:6px; margin-bottom:22px; }
+    .progress-step  { flex:1; height:7px; background:#e5e7eb; border-radius:4px; transition:background .3s; }
+    .progress-step.done   { background:#4caf50; }
+    .progress-step.active { background:#e91e63; }
+
+    /* Item counter */
+    .voice-item-counter {
+        background:#fff3e0; border:1px solid #ffcc02;
+        border-radius:10px; padding:9px 16px;
+        font-size:0.9rem; color:#e65100; font-weight:600;
+        margin-bottom:16px; display:none;
+    }
+    .voice-item-counter.visible { display:block; }
+
+    /* Question bubble */
+    .ai-question-bubble {
+        background:linear-gradient(135deg,#fce4ec,#f8bbd0);
+        border-left:6px solid #e91e63; border-radius:18px;
+        padding:22px 26px; margin-bottom:18px; min-height:92px;
+        display:flex; align-items:center;
+    }
+    .question-label {
+        font-size:0.77rem; color:#e91e63; font-weight:700;
+        display:block; margin-bottom:7px; text-transform:uppercase; letter-spacing:0.6px;
+    }
+    #aiQuestionText { font-size:1.25rem; color:#1f2937; font-weight:600; line-height:1.55; }
+
+    /* Answer bubble */
+    .user-answer-bubble {
+        background:#f9fafb; border:1.5px solid #e5e7eb; border-radius:16px;
+        padding:16px 20px; margin-bottom:18px; min-height:64px;
+        display:flex; align-items:center;
+    }
+    .user-label { font-size:0.77rem; color:#6b7280; font-weight:700; display:block; margin-bottom:5px; text-transform:uppercase; }
+    #userAnswerText { font-size:1.08rem; color:#374151; }
+
+    /* Wave */
+    .voice-wave { display:flex; align-items:center; justify-content:center; gap:6px; height:50px; margin:10px 0; }
+    .voice-wave.hidden { display:none; }
+    .wave-bar { width:6px; background:#e91e63; border-radius:3px; animation:wave 1.2s ease-in-out infinite; }
+    .wave-bar:nth-child(1){height:12px;animation-delay:0s}
+    .wave-bar:nth-child(2){height:26px;animation-delay:.1s}
+    .wave-bar:nth-child(3){height:38px;animation-delay:.2s}
+    .wave-bar:nth-child(4){height:26px;animation-delay:.3s}
+    .wave-bar:nth-child(5){height:12px;animation-delay:.4s}
+    @keyframes wave { 0%,100%{transform:scaleY(0.5);opacity:0.6} 50%{transform:scaleY(1);opacity:1} }
+
+    /* Status */
+    .voice-status { text-align:center; font-size:0.97rem; color:#6b7280; margin-bottom:20px; min-height:26px; }
+    .voice-status.listening  { color:#e91e63; font-weight:700; }
+    .voice-status.speaking   { color:#43a047; font-weight:700; }
+    .voice-status.processing { color:#f59e0b; font-weight:700; }
+
+    /* Action buttons */
+    .voice-action-btns { display:flex; gap:14px; }
+    .btn-voice-mic {
+        flex:1; padding:18px;
+        background:linear-gradient(135deg,#e91e63,#c2185b);
+        color:#fff; border:none; border-radius:16px;
+        font-size:1.15rem; font-weight:700; cursor:pointer;
+        display:flex; align-items:center; justify-content:center; gap:10px;
+        box-shadow:0 5px 18px rgba(233,30,99,0.4); transition:all .2s;
+    }
+    .btn-voice-mic:hover    { transform:translateY(-2px); box-shadow:0 7px 24px rgba(233,30,99,0.5); }
+    .btn-voice-mic:disabled { opacity:0.45; cursor:not-allowed; transform:none; box-shadow:none; }
+    .btn-voice-skip {
+        padding:18px 24px; background:#f3f4f6; color:#6b7280;
+        border:none; border-radius:16px; font-size:1rem; font-weight:600;
+        cursor:pointer; transition:background .2s;
+    }
+    .btn-voice-skip:hover { background:#e5e7eb; }
+
+    /* Toast */
+    .field-filled-toast {
+        position:fixed; top:22px; right:22px;
+        background:#43a047; color:#fff;
+        padding:13px 22px; border-radius:12px;
+        font-size:0.92rem; font-weight:600;
+        z-index:99999; box-shadow:0 4px 18px rgba(67,160,71,0.45);
+        display:none; animation:toastIn .3s ease;
+    }
+    @keyframes toastIn { from{transform:translateX(70px);opacity:0} to{transform:translateX(0);opacity:1} }
+
+    /* PDF button */
+    .btn-pdf {
+        padding:15px 30px; border:none; border-radius:8px;
+        font-size:1rem; font-weight:600; cursor:pointer;
+        font-family:'Poppins',sans-serif; transition:all .3s ease;
+        background:linear-gradient(135deg,#e53935,#b71c1c);
+        color:#fff; box-shadow:0 4px 15px rgba(229,57,53,0.35);
+    }
+    .btn-pdf:hover    { transform:translateY(-2px); box-shadow:0 6px 22px rgba(229,57,53,0.5); }
+    .btn-pdf:disabled { opacity:0.55; cursor:not-allowed; transform:none; }
+    </style>
+</head>
+<body>
+
+<!-- Toast -->
+<div class="field-filled-toast" id="fieldToast">✅ Field filled!</div>
+
+<!-- Floating Voice Button -->
+<button class="voice-assistant-btn" id="voiceAssistantBtn" title="குரல் உதவியாளர் / Voice Assistant">
+    <svg viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm-1-9c0-.55.45-1 1-1s1 .45 1 1v6c0 .55-.45 1-1 1s-1-.45-1-1V5zm6 6c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
+</button>
+
+<!-- ════ VOICE AI MODAL ════ -->
+<div class="voice-modal" id="voiceModal">
+    <div class="voice-panel">
+        <button class="voice-close-btn" id="voiceCloseBtn">✕</button>
+
+        <!-- AI Avatar -->
+        <div class="ai-avatar-row">
+            <div class="ai-avatar" id="aiAvatarEl"><img src="ai.png" alt="AI Avatar" style="width: 100%; height: 100%; border-radius: 50%; object-fit: cover;"></div>
+            <div class="ai-avatar-info">
+                <div class="ai-avatar-name"><span class="ai-status-dot"></span> Gopika AI</div>
+                <div class="ai-avatar-role">GM Tailors பில் உதவியாளர் · Female Voice Assistant</div>
+                <div class="ai-speaking-bars hidden" id="aiSpeakingBars">
+                    <div class="sbar"></div><div class="sbar"></div><div class="sbar"></div>
+                    <div class="sbar"></div><div class="sbar"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="voice-progress" id="voiceProgress"></div>
+        <div class="voice-item-counter" id="voiceItemCounter">📦 Item 1 of ?</div>
+
+        <div class="ai-question-bubble">
+            <div>
+                <span class="question-label">🤖 AI கேள்வி / AI Question</span>
+                <span id="aiQuestionText">Tap the mic button to begin…</span>
+            </div>
+        </div>
+
+        <div class="user-answer-bubble">
+            <div>
+                <span class="user-label">🎤 Your answer / உங்கள் பதில்</span>
+                <span id="userAnswerText">—</span>
+            </div>
+        </div>
+
+        <div class="voice-wave hidden" id="voiceWave">
+            <div class="wave-bar"></div><div class="wave-bar"></div>
+            <div class="wave-bar"></div><div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+        </div>
+
+        <div class="voice-status" id="voiceStatus">Tap the mic to start</div>
+
+        <div class="voice-action-btns">
+            <button class="btn-voice-mic" id="voiceMicBtn" disabled>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="white">
+                    <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm-1-9c0-.55.45-1 1-1s1 .45 1 1v6c0 .55-.45 1-1 1s-1-.45-1-1V5zm6 6c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                </svg>
+                🎤 பேசுங்கள் / Speak
+            </button>
+            <button class="btn-voice-skip" id="voiceSkipBtn">Skip ⏭</button>
+        </div>
+    </div>
+</div>
+
+<!-- ════ FORM ════ -->
+<div class="form-container" id="formContainer">
+    <div class="form-header">
+        <h2 class="form-title" data-lang-en="📝 Create Invoice" data-lang-ta="📝 பில் உருவாக்கவும்">📝 Create Invoice</h2>
+        <button type="button" class="btn-language" id="languageToggle"><span id="langText">தமிழ்</span></button>
+    </div>
+    <form id="invoiceForm">
+        <div class="form-section">
+            <h3 data-lang-en="Customer Details" data-lang-ta="வாடிக்கையாளர் விவரங்கள்">Customer Details</h3>
+            <div class="form-group">
+                <label for="customerName" data-lang-en="Customer Name:" data-lang-ta="வாடிக்கையாளர் பெயர்:">Customer Name:</label>
+                <input type="text" id="customerName" name="customerName" required>
+            </div>
+            <div class="form-group">
+                <label for="phoneNumber" data-lang-en="Phone Number:" data-lang-ta="தொலைபேசி எண்:">Phone Number:</label>
+                <input type="tel" id="phoneNumber" name="phoneNumber" required>
+            </div>
+        </div>
+        <div class="form-section">
+            <h3 data-lang-en="Items" data-lang-ta="பொருட்கள்">Items</h3>
+            <div class="form-group">
+                <label for="numItems" data-lang-en="Number of Items:" data-lang-ta="பொருட்களின் எண்ணிக்கை:">Number of Items:</label>
+                <input type="number" id="numItems" name="numItems" min="1" max="15" value="1" required>
+            </div>
+            <div id="itemsContainer" class="items-container"></div>
+        </div>
+        <div class="form-section total-section">
+            <div class="total-display">
+                <strong data-lang-en="Total Amount:" data-lang-ta="மொத்த தொகை:">Total Amount:</strong>
+                <span id="formTotal">₹0.00</span>
+            </div>
+            <div class="total-words">
+                <strong data-lang-en="In Words:" data-lang-ta="வார்த்தைகளில்:">In Words:</strong>
+                <span id="formTotalWords">Zero Rupees Only</span>
+            </div>
+        </div>
+        <button type="submit" class="btn-submit" data-lang-en="Generate Invoice" data-lang-ta="பில் உருவாக்கவும்">Generate Invoice</button>
+    </form>
+</div>
+
+<!-- ════ INVOICE TEMPLATE ════ -->
+<div class="invoice-container" id="invoiceTemplate" style="display:none;">
+    <div class="corner-shape-red"></div>
+    <div class="corner-shape-black"></div>
+    <header>
+        <img width="70px" src="vin.jpg"><br>
+        <div class="company-header">
+            <img class="company-logo" height="80px" src="logo.png">
+            <h1 class="company-name">GM TAILORS</h1>
+        </div>
+        <div class="address-details">
+            <p><b>ஸ்ரீ முனிஸ்வரர் துணை</b></p>
+            <p>Plot no 62, 3rd cross street, bethel garden, anna nagar, morai chennai-55</p>
+            <p>9043943533, 9003770263</p>
+            <p>GMtailor9021@gmail.com</p>
+        </div>
+    </header>
+    <h4>Customer Details:</h4>
+    <section class="invoice-details">
+        <div class="customer-info">
+            <div class="row">
+                <span class="label">Name :</span>
+                <span class="value" id="displayCustomerName" style="border-bottom:1px dotted #ccc;display:inline-block;width:100%;"></span>
+            </div>
+            <div class="row">
+                <span class="label">Phone Number :</span>
+                <span class="value" id="displayPhoneNumber" style="border-bottom:1px dotted #ccc;display:inline-block;width:100%;"></span>
+            </div>
+        </div>
+    </section>
+    <section class="items-table-section">
+        <table class="items-table">
+            <thead>
+                <tr>
+                    <th class="col-sl">Sl.No.</th>
+                    <th class="col-desc">Description</th>
+                    <th class="col-qty">Qty.</th>
+                    <th class="col-rate">Rate</th>
+                    <th class="col-amount">Amount</th>
+                </tr>
+            </thead>
+            <tbody id="invoiceTableBody"></tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="4" class="total-label">Total</td>
+                    <td class="total-amount" id="displayTotal"></td>
+                </tr>
+            </tfoot>
+        </table>
+    </section>
+    <section class="footer-section">
+        <div class="amount-words">
+            <span class="label">Rupees in words :</span>
+            <span class="value" id="displayTotalWords"></span>
+        </div>
+        <div class="terms-signature">
+            <div class="terms">
+                <p class="label">Online Payment :</p>
+                <div class="gpay-container">
+                    <img src="gpay.png" alt="Google Pay QR Code" class="gpay-image">
+                </div>
+            </div>
+        </div>
+    </section>
+    <div class="corner-shape-red-br"></div>
+    <div class="corner-shape-black-br"></div>
+</div>
+
+<!-- ════ DOWNLOAD BUTTONS ════ -->
+<div class="download-container" id="downloadContainer" style="display:none;">
+    <button class="btn-download" id="downloadBtn">📥 Download as Image</button>
+    <button class="btn-pdf"      id="downloadPdfBtn">📄 Download as PDF</button>
+    <button class="btn-edit"     id="editInvoiceBtn">✏️ Edit Invoice</button>
+    <button class="btn-new"      id="newInvoiceBtn">📝 New Invoice</button>
+</div>
+
+<!-- Original invoice logic -->
+<script src="script.js"></script>
+
+<!-- ════════════════════════════════════════════════════
+     PDF DOWNLOAD
+════════════════════════════════════════════════════ -->
+<script>
+function downloadInvoiceAsPDF() {
+    const invoice = document.getElementById('invoiceTemplate');
+    const btn     = document.getElementById('downloadPdfBtn');
+
+    if (typeof html2canvas === 'undefined' || typeof window.jspdf === 'undefined') {
+        alert('PDF library not loaded. Please refresh and try again.');
+        return;
+    }
+
+    const origText  = btn.innerHTML;
+    btn.innerHTML   = '⏳ Generating PDF…';
+    btn.disabled    = true;
+
+    html2canvas(invoice, {
+        scale: 2, useCORS: true, allowTaint: true,
+        logging: false, backgroundColor: '#ffffff',
+        windowWidth: invoice.scrollWidth,
+        windowHeight: invoice.scrollHeight,
+        onclone: doc => {
+            const el = doc.getElementById('invoiceTemplate');
+            if (el) el.style.display = 'flex';
+        }
+    }).then(canvas => {
+        const { jsPDF } = window.jspdf;
+        const imgData   = canvas.toDataURL('image/png');
+        const pdfW      = 210; // A4 width mm
+        const pdfH      = (canvas.height * pdfW) / canvas.width;
+
+        const pdf = new jsPDF({
+            orientation: pdfH > pdfW ? 'portrait' : 'landscape',
+            unit: 'mm',
+            format: [pdfW, pdfH]
+        });
+        pdf.addImage(imgData, 'PNG', 0, 0, pdfW, pdfH);
+
+        const name = document.getElementById('displayCustomerName').textContent || 'Customer';
+        const date = new Date().toISOString().split('T')[0];
+        pdf.save(`Invoice_${name.replace(/\s+/g,'_')}_${date}.pdf`);
+
+        btn.innerHTML = origText;
+        btn.disabled  = false;
+        alert('✅ PDF downloaded successfully! / PDF வெற்றிகரமாக பதிவிறக்கப்பட்டது!');
+    }).catch(err => {
+        console.error(err);
+        alert('Error generating PDF. Please try again.');
+        btn.innerHTML = origText;
+        btn.disabled  = false;
+    });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('downloadPdfBtn').addEventListener('click', downloadInvoiceAsPDF);
+});
+</script>
+
+<!-- ════════════════════════════════════════════════════
+     VOICE AI ASSISTANT — Gopika AI (Female Voice)
+════════════════════════════════════════════════════ -->
+<script>
+// ── Step definitions ──────────────────────────────────────────
+const BASE_STEPS = [
+    { field:'customerName', ta:'வாடிக்கையாளர் பெயர் என்ன?',       en:"What is the customer's name?",    type:'text'   },
+    { field:'phoneNumber',  ta:'தொலைபேசி எண் என்ன?',               en:'What is the phone number?',        type:'tel'    },
+    { field:'numItems',     ta:'எத்தனை பொருட்கள் உள்ளன?',           en:'How many items are there?',        type:'number' }
+];
+function getItemSteps(idx) {
+    const n = idx + 1;
+    return [
+        { field:`item-desc-${idx}`, ta:`பொருள் ${n}: விளக்கம் என்ன?`,  en:`Item ${n}: What is the description?`, type:'text'   },
+        { field:`item-qty-${idx}`,  ta:`பொருள் ${n}: எத்தனை உள்ளன?`,   en:`Item ${n}: What is the quantity?`,    type:'number' },
+        { field:`item-rate-${idx}`, ta:`பொருள் ${n}: விலை என்ன?`,       en:`Item ${n}: What is the rate/price?`,  type:'number' }
+    ];
+}
+
+// ── State ──────────────────────────────────────────────────────
+const va = { steps:[], step:0, numItems:1, recognition:null, listening:false };
+
+// ── Female voice loader ────────────────────────────────────────
+let femaleVoice = null;
+function pickFemaleVoice() {
+    const voices = window.speechSynthesis.getVoices();
+    if (!voices.length) return;
+    const F = ['female','woman','zira','susan','samantha','victoria','karen','moira',
+               'tessa','fiona','heera','priya','aditi','raveena','lekha','veena'];
+    femaleVoice =
+        voices.find(v => v.lang.startsWith('ta') && F.some(n => v.name.toLowerCase().includes(n))) ||
+        voices.find(v => v.lang.startsWith('ta')) ||
+        voices.find(v => v.lang === 'en-IN'       && F.some(n => v.name.toLowerCase().includes(n))) ||
+        voices.find(v => F.some(n => v.name.toLowerCase().includes(n))) ||
+        voices[0];
+    console.log('🎙️ Voice:', femaleVoice?.name, femaleVoice?.lang);
+}
+window.speechSynthesis.onvoiceschanged = pickFemaleVoice;
+pickFemaleVoice();
+
+// ── Speak (female voice, Tamil) ────────────────────────────────
+function speak(text, onEnd) {
+    if (!window.speechSynthesis) { onEnd?.(); return; }
+    window.speechSynthesis.cancel();
+    setTimeout(() => {
+        const utt    = new SpeechSynthesisUtterance(text);
+        utt.lang     = 'ta-IN';
+        utt.rate     = 0.88;
+        utt.pitch    = 1.2;   // higher = more feminine
+        utt.volume   = 1;
+        if (femaleVoice) utt.voice = femaleVoice;
+
+        const avatar = document.getElementById('aiAvatarEl');
+        const bars   = document.getElementById('aiSpeakingBars');
+        setBtnState('speaking');
+        setStatus('🔊 AI பேசுகிறது… / AI Speaking…', 'speaking');
+        avatar.classList.add('speaking-anim');
+        bars.classList.remove('hidden');
+
+        utt.onend = utt.onerror = () => {
+            setBtnState('idle');
+            avatar.classList.remove('speaking-anim');
+            bars.classList.add('hidden');
+            onEnd?.();
+        };
+        window.speechSynthesis.speak(utt);
+    }, 100);
+}
+
+// ── Listen (Tamil speech recognition) ─────────────────────────
+function listenOnce(onResult, onError) {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { onError('Use Chrome or Edge for voice support.'); return; }
+    const rec = new SR();
+    rec.lang = 'ta-IN'; rec.interimResults = false; rec.maxAlternatives = 3;
+    va.recognition = rec;
+    rec.onstart  = () => { va.listening=true; setBtnState('listening'); setStatus('🎤 கேட்கிறேன்… / Listening…','listening'); document.getElementById('voiceWave').classList.remove('hidden'); };
+    rec.onresult = e  => { va.listening=false; document.getElementById('voiceWave').classList.add('hidden'); onResult(e.results[0][0].transcript); };
+    rec.onerror  = e  => { va.listening=false; document.getElementById('voiceWave').classList.add('hidden'); setBtnState('idle'); onError(e.error); };
+    rec.onend    = ()  => { va.listening=false; document.getElementById('voiceWave').classList.add('hidden'); };
+    rec.start();
+}
+
+// ── Claude AI extraction ───────────────────────────────────────
+async function extractWithAI(transcript, fieldType, context) {
+    try {
+        const res = await fetch('https://api.anthropic.com/v1/messages', {
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({
+                model:'claude-sonnet-4-20250514', max_tokens:80,
+                system:`Extract the value for billing field: "${context}" (type:${fieldType}).
+Return ONLY JSON {"value":"..."}, no markdown.
+Tamil numbers: ஒன்று=1 இரண்டு=2 மூன்று=3 நான்கு=4 ஐந்து=5 ஆறு=6 ஏழு=7 எட்டு=8 ஒன்பது=9 பத்து=10 நூறு=100 ஆயிரம்=1000
+For names: transliterate to English. For price/qty: digits only.`,
+                messages:[{role:'user',content:transcript}]
+            })
+        });
+        const data = await res.json();
+        const txt  = data.content?.[0]?.text || '';
+        return JSON.parse(txt.replace(/```json|```/g,'')).value || transcript;
+    } catch {
+        const m = transcript.match(/\d+/g);
+        return (fieldType==='number'||fieldType==='tel') && m ? m.join('') : transcript;
+    }
+}
+
+// ── Build steps ────────────────────────────────────────────────
+function buildSteps() {
+    va.steps = [...BASE_STEPS];
+    for (let i=0; i<va.numItems; i++) va.steps.push(...getItemSteps(i));
+    renderProgress();
+}
+function renderProgress() {
+    const el = document.getElementById('voiceProgress');
+    el.innerHTML = '';
+    va.steps.forEach((_,i) => {
+        const d = document.createElement('div');
+        d.className = 'progress-step'+(i<va.step?' done':i===va.step?' active':'');
+        el.appendChild(d);
+    });
+}
+
+// ── Ask step ───────────────────────────────────────────────────
+function askStep() {
+    if (va.step >= va.steps.length) { finishAll(); return; }
+    const s = va.steps[va.step];
+    document.getElementById('aiQuestionText').textContent = s.ta;
+    document.getElementById('userAnswerText').textContent  = '—';
+    renderProgress();
+
+    const counter = document.getElementById('voiceItemCounter');
+    if (s.field.startsWith('item-')) {
+        counter.textContent = `📦 Item ${parseInt(s.field.split('-').pop())+1} of ${va.numItems}`;
+        counter.classList.add('visible');
+    } else { counter.classList.remove('visible'); }
+
+    document.getElementById('voiceMicBtn').disabled = true;
+    // ✅ AI speaks the question aloud in Tamil female voice
+    speak(s.ta, () => {
+        setStatus('🎤 Tap mic / பதில் சொல்லுங்கள்','');
+        document.getElementById('voiceMicBtn').disabled = false;
+    });
+}
+
+// ── Mic click ──────────────────────────────────────────────────
+async function onMicClick() {
+    if (va.listening) return;
+    document.getElementById('voiceMicBtn').disabled = true;
+    listenOnce(async transcript => {
+        document.getElementById('userAnswerText').textContent = transcript;
+        setStatus('⏳ புரிந்துகொள்கிறேன்… / Processing…','processing');
+        const s   = va.steps[va.step];
+        const val = await extractWithAI(transcript, s.type, s.en);
+        fillField(s.field, val);
+        if (s.field === 'numItems') { va.step++; buildSteps(); askStep(); }
+        else { va.step++; setTimeout(askStep, 500); }
+    }, err => {
+        setStatus('❌ '+err+' — try again','');
+        document.getElementById('voiceMicBtn').disabled = false;
+    });
+}
+
+// ── Fill field ─────────────────────────────────────────────────
+function fillField(key, val) {
+    function toast(msg) {
+        const t = document.getElementById('fieldToast');
+        t.textContent = msg; t.style.display='block';
+        setTimeout(()=>t.style.display='none', 2400);
+    }
+    if      (key==='customerName')           { document.getElementById('customerName').value = val; toast('✅ பெயர்: '+val); }
+    else if (key==='phoneNumber')            { document.getElementById('phoneNumber').value  = val; toast('✅ தொலைபேசி: '+val); }
+    else if (key==='numItems')               {
+        const n = Math.max(1,parseInt(val)||1);
+        document.getElementById('numItems').value = n;
+        va.numItems = n;
+        if (typeof generateItemRows==='function') generateItemRows();
+        toast('✅ பொருட்கள்: '+n);
+    }
+    else if (key.startsWith('item-desc-'))   { const i=parseInt(key.split('-').pop())+1; const el=document.querySelector(`.item-desc[data-index="${i}"]`); if(el){el.value=val; toast(`✅ பொருள் ${i}: `+val);} }
+    else if (key.startsWith('item-qty-'))    { const i=parseInt(key.split('-').pop())+1; const el=document.querySelector(`.item-qty[data-index="${i}"]`);  if(el){el.value=parseInt(val)||1; el.dispatchEvent(new Event('input')); toast(`✅ அளவு ${i}: `+val);} }
+    else if (key.startsWith('item-rate-'))   { const i=parseInt(key.split('-').pop())+1; const el=document.querySelector(`.item-rate[data-index="${i}"]`); if(el){el.value=parseFloat(val)||0; el.dispatchEvent(new Event('input')); toast(`✅ விலை ${i}: ₹`+val);} }
+}
+
+// ── Finish ─────────────────────────────────────────────────────
+function finishAll() {
+    setStatus('✅ அனைத்தும் நிரப்பப்பட்டது! / All done!','speaking');
+    document.getElementById('aiQuestionText').textContent = '✅ பில் தயார்! Generate Invoice அழுத்துங்கள்.';
+    renderProgress();
+    speak('பில் தயாராகிவிட்டது. சரிபார்த்து Generate Invoice அழுத்துங்கள்.', () => {
+        setTimeout(()=>document.getElementById('voiceModal').classList.remove('active'), 1800);
+    });
+}
+
+// ── Open / Close ───────────────────────────────────────────────
+function openVoice() {
+    va.step     = 0;
+    va.numItems = parseInt(document.getElementById('numItems').value)||1;
+    buildSteps();
+    document.getElementById('voiceModal').classList.add('active');
+    document.getElementById('voiceMicBtn').disabled = true;
+    document.getElementById('userAnswerText').textContent = '—';
+    document.getElementById('voiceWave').classList.add('hidden');
+    document.getElementById('aiSpeakingBars').classList.add('hidden');
+    speak('வணக்கம்! நான் Gopika. GM Tailors பில் உதவியாளர். நான் கேட்கும் கேள்விகளுக்கு பதில் சொல்லுங்கள்.', () => askStep());
+}
+function closeVoice() {
+    window.speechSynthesis.cancel();
+    try { va.recognition?.stop(); } catch {}
+    va.listening = false;
+    document.getElementById('voiceModal').classList.remove('active');
+    setBtnState('idle');
+}
+
+// ── Helpers ────────────────────────────────────────────────────
+function setBtnState(s) {
+    document.getElementById('voiceAssistantBtn').className = 'voice-assistant-btn'+(s!=='idle'?' '+s:'');
+}
+function setStatus(msg, cls) {
+    const el = document.getElementById('voiceStatus');
+    el.textContent = msg;
+    el.className   = 'voice-status'+(cls?' '+cls:'');
+}
+
+// ── Wire up events ─────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('voiceAssistantBtn').addEventListener('click', openVoice);
+    document.getElementById('voiceCloseBtn').addEventListener('click', closeVoice);
+    document.getElementById('voiceMicBtn').addEventListener('click', onMicClick);
+    document.getElementById('voiceSkipBtn').addEventListener('click', () => { if(va.step<va.steps.length){va.step++;askStep();} });
+    document.getElementById('voiceModal').addEventListener('click', e => { if(e.target===document.getElementById('voiceModal')) closeVoice(); });
+});
+</script>
+
+</body>
+</html>
