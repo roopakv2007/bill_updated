@@ -1,0 +1,47 @@
+name: Android APK release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+          cache-dependency-path: app/pubspec.lock
+
+      - name: Build split APKs
+        working-directory: app
+        run: |
+          flutter pub get
+          flutter build apk --release --split-per-abi
+
+      - name: Publish APKs to GitHub Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$RELEASE_TAG" \
+            app/build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk \
+            app/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk \
+            app/build/app/outputs/flutter-apk/app-x86_64-release.apk \
+            --title "GM Tailors Bills $RELEASE_TAG" \
+            --notes "Updated branding, themes, Tamil app language, app settings, and bill image/PDF download and sharing. The invoice template is preserved."
