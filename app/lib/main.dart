@@ -12,6 +12,16 @@ import 'package:shared_preferences/shared_preferences.dart';
 const pink = Color(0xFFE91E63);
 const green = Color(0xFF8BC34A);
 const ink = Color(0xFF242A35);
+const ledgerCanvas = Color(0xFFFBF9F5);
+const ledgerSurface = Color(0xFFFFFFFF);
+const ledgerInset = Color(0xFFF5F1E9);
+const ledgerBorder = Color(0xFFE7E2D8);
+const ledgerInk = Color(0xFF141B2D);
+const ledgerMuted = Color(0xFF6F7785);
+const vermilion = Color(0xFFD9381E);
+const ledgerTeal = Color(0xFF238C87);
+const ledgerGold = Color(0xFFD3A343);
+const ledgerLeaf = Color(0xFF75A66A);
 const rupees = '₹';
 final money = NumberFormat.currency(
   locale: 'en_IN',
@@ -134,27 +144,30 @@ class GmApp extends StatelessWidget {
     debugShowCheckedModeBanner: false,
     theme: ThemeData(
       useMaterial3: true,
-      scaffoldBackgroundColor: const Color(0xFFF5F6F8),
-      colorScheme: ColorScheme.fromSeed(seedColor: pink),
+      scaffoldBackgroundColor: ledgerCanvas,
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: vermilion,
+        surface: ledgerCanvas,
+      ),
       appBarTheme: const AppBarTheme(
-        backgroundColor: Color(0xFFF5F6F8),
-        foregroundColor: ink,
+        backgroundColor: ledgerCanvas,
+        foregroundColor: ledgerInk,
         centerTitle: false,
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: Colors.white,
+        fillColor: ledgerSurface,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 14,
           vertical: 13,
         ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFFF4BDD0)),
+          borderSide: const BorderSide(color: ledgerBorder),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFFF4BDD0)),
+          borderSide: const BorderSide(color: ledgerBorder),
         ),
       ),
     ),
@@ -193,7 +206,8 @@ class _HomeShellState extends State<HomeShell> {
         onHistory: () => setState(() => tab = 1),
       ),
       HistoryPage(onEdit: (b) => create(bill: b)),
-      const AnalyticsPage(),
+      AnalyticsPage(onManual: () => create(manual: true)),
+      const SettingsPage(),
     ];
     return Scaffold(
       body: SafeArea(
@@ -202,13 +216,16 @@ class _HomeShellState extends State<HomeShell> {
       floatingActionButton: tab == 0
           ? FloatingActionButton.extended(
               onPressed: () => create(),
-              backgroundColor: pink,
+              backgroundColor: vermilion,
               foregroundColor: Colors.white,
               icon: const Icon(Icons.add),
               label: const Text('New bill'),
             )
           : null,
       bottomNavigationBar: NavigationBar(
+        backgroundColor: ledgerSurface,
+        indicatorColor: const Color(0xFFFBE5DF),
+        elevation: 0,
         selectedIndex: tab,
         onDestinationSelected: (v) => setState(() => tab = v),
         destinations: const [
@@ -221,6 +238,10 @@ class _HomeShellState extends State<HomeShell> {
           NavigationDestination(
             icon: Icon(Icons.insights_outlined),
             label: 'Analysis',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.tune_outlined),
+            label: 'Settings',
           ),
         ],
       ),
@@ -237,15 +258,17 @@ class Dashboard extends StatelessWidget {
   });
   final VoidCallback onCreate, onManual, onHistory;
   @override
-  Widget build(BuildContext context) {
-    final today = DateTime.now();
-    final monthBills = store.bills
-        .where((b) => b.date.year == today.year && b.date.month == today.month)
-        .toList();
-    final total = monthBills.fold<double>(0, (v, b) => v + b.total);
-    return AnimatedBuilder(
-      animation: store,
-      builder: (_, _) => CustomScrollView(
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: store,
+    builder: (_, _) {
+      final today = DateTime.now();
+      final monthBills = store.bills
+          .where(
+            (b) => b.date.year == today.year && b.date.month == today.month,
+          )
+          .toList();
+      final total = monthBills.fold<double>(0, (v, b) => v + b.total);
+      return CustomScrollView(
         slivers: [
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
@@ -253,14 +276,26 @@ class Dashboard extends StatelessWidget {
               delegate: SliverChildListDelegate([
                 Row(
                   children: [
-                    Image.asset(
-                      'assets/vin.jpg',
-                      width: 38,
-                      height: 38,
-                      errorBuilder: (_, _, _) =>
-                          const Icon(Icons.content_cut, color: pink, size: 34),
+                    Container(
+                      width: 46,
+                      height: 46,
+                      decoration: BoxDecoration(
+                        color: ledgerInset,
+                        border: Border.all(color: ledgerBorder),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: Image.asset(
+                        'assets/vin.jpg',
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => const Icon(
+                          Icons.content_cut,
+                          color: vermilion,
+                          size: 25,
+                        ),
+                      ),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 12),
                     const Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -268,21 +303,26 @@ class Dashboard extends StatelessWidget {
                           Text(
                             'GM TAILORS',
                             style: TextStyle(
-                              fontSize: 20,
+                              fontSize: 17,
                               fontWeight: FontWeight.w800,
-                              color: pink,
+                              letterSpacing: 1.1,
+                              color: ledgerInk,
                             ),
                           ),
                           Text(
-                            'Bills & business overview',
-                            style: TextStyle(color: Colors.black54),
+                            'Your business, well measured.',
+                            style: TextStyle(color: ledgerMuted, fontSize: 12),
                           ),
                         ],
                       ),
                     ),
-                    IconButton(
+                    IconButton.filledTonal(
+                      style: IconButton.styleFrom(
+                        backgroundColor: ledgerInset,
+                        foregroundColor: ledgerInk,
+                      ),
                       onPressed: onHistory,
-                      icon: const Icon(Icons.history),
+                      icon: const Icon(Icons.receipt_long_outlined),
                     ),
                   ],
                 ),
@@ -290,75 +330,138 @@ class Dashboard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(22),
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [pink, Color(0xFFAD1457)],
-                    ),
+                    color: ledgerInk,
                     borderRadius: BorderRadius.circular(22),
+                    border: Border.all(color: const Color(0xFF31394A)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        DateFormat('MMMM yyyy').format(today),
-                        style: const TextStyle(color: Colors.white70),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.calendar_month_outlined,
+                            size: 16,
+                            color: Color(0xFFD9CDBA),
+                          ),
+                          const SizedBox(width: 7),
+                          Text(
+                            DateFormat('MMMM yyyy').format(today).toUpperCase(),
+                            style: const TextStyle(
+                              color: Color(0xFFD9CDBA),
+                              fontSize: 11,
+                              letterSpacing: 1.1,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const Spacer(),
+                          const Icon(
+                            Icons.ssid_chart,
+                            size: 18,
+                            color: Color(0xFFFF927B),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 14),
+                      const Text(
+                        'Income recorded',
+                        style: TextStyle(color: Colors.white70, fontSize: 13),
+                      ),
+                      const SizedBox(height: 3),
                       Text(
                         money.format(total),
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 30,
+                          fontSize: 32,
+                          letterSpacing: -1,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
-                      Text(
-                        '${monthBills.length} bills recorded this month',
-                        style: const TextStyle(color: Colors.white70),
+                      const SizedBox(height: 16),
+                      Container(height: 1, color: const Color(0xFF3A4251)),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.receipt_long_outlined,
+                            size: 16,
+                            color: Color(0xFFFF927B),
+                          ),
+                          const SizedBox(width: 7),
+                          Text(
+                            '${monthBills.length} records this month',
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 12,
+                            ),
+                          ),
+                          const Spacer(),
+                          Text(
+                            '${monthBills.where((b) => b.manual).length} manual',
+                            style: const TextStyle(
+                              color: Color(0xFF9DD3C8),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 18),
+                const SizedBox(height: 16),
                 Row(
                   children: [
                     Expanded(
                       child: _ActionCard(
-                        icon: Icons.receipt_long,
+                        icon: Icons.add_to_photos_outlined,
                         title: 'Create bill',
-                        subtitle: 'Generate invoice',
-                        color: pink,
+                        subtitle: 'Build an invoice',
+                        color: vermilion,
                         onTap: onCreate,
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: _ActionCard(
-                        icon: Icons.add_card,
+                        icon: Icons.add_card_outlined,
                         title: 'Add income',
-                        subtitle: 'No bill needed',
-                        color: green,
+                        subtitle: 'Record without a bill',
+                        color: ledgerTeal,
                         onTap: onManual,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 26),
+                const SizedBox(height: 27),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'Recent bills',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 18,
-                      ),
+                    const Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Recent activity',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 20,
+                            color: ledgerInk,
+                          ),
+                        ),
+                        SizedBox(height: 3),
+                        Text(
+                          'A running record of your shop',
+                          style: TextStyle(color: ledgerMuted, fontSize: 12),
+                        ),
+                      ],
                     ),
                     TextButton(
                       onPressed: onHistory,
-                      child: const Text('See all'),
+                      style: TextButton.styleFrom(foregroundColor: vermilion),
+                      child: const Text('View all'),
                     ),
                   ],
                 ),
+                const SizedBox(height: 8),
                 if (store.bills.isEmpty)
                   const _EmptyState(
                     text: 'Your saved bills and income will appear here.',
@@ -377,9 +480,9 @@ class Dashboard extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
+      );
+    },
+  );
 }
 
 class _ActionCard extends StatelessWidget {
@@ -401,19 +504,32 @@ class _ActionCard extends StatelessWidget {
     child: Container(
       padding: const EdgeInsets.all(17),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: ledgerSurface,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFECEEF1)),
+        border: Border.all(color: ledgerBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: color),
-          const SizedBox(height: 14),
-          Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: .10),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(height: 13),
+          Text(
+            title,
+            style: const TextStyle(
+              fontWeight: FontWeight.w800,
+              color: ledgerInk,
+            ),
+          ),
           Text(
             subtitle,
-            style: const TextStyle(color: Colors.black54, fontSize: 12),
+            style: const TextStyle(color: ledgerMuted, fontSize: 11),
           ),
         ],
       ),
@@ -429,14 +545,15 @@ class _EmptyState extends StatelessWidget {
     margin: const EdgeInsets.only(top: 8),
     padding: const EdgeInsets.all(22),
     decoration: BoxDecoration(
-      color: Colors.white,
+      color: ledgerSurface,
       borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: ledgerBorder),
     ),
     child: Center(
       child: Text(
         text,
         textAlign: TextAlign.center,
-        style: const TextStyle(color: Colors.black54),
+        style: const TextStyle(color: ledgerMuted),
       ),
     ),
   );
@@ -452,36 +569,58 @@ class BillTile extends StatelessWidget {
   final Bill bill;
   final VoidCallback onTap, onDelete;
   @override
-  Widget build(BuildContext context) => Card(
-    color: Colors.white,
-    elevation: 0,
+  Widget build(BuildContext context) => Container(
     margin: const EdgeInsets.only(bottom: 9),
+    decoration: BoxDecoration(
+      color: ledgerSurface,
+      border: Border.all(color: ledgerBorder),
+      borderRadius: BorderRadius.circular(15),
+    ),
     child: ListTile(
+      contentPadding: const EdgeInsets.fromLTRB(12, 3, 4, 3),
       onTap: onTap,
-      leading: CircleAvatar(
-        backgroundColor: bill.manual
-            ? const Color(0xFFEAF4DF)
-            : const Color(0xFFFCE4EC),
+      leading: Container(
+        width: 42,
+        height: 42,
+        decoration: BoxDecoration(
+          color: bill.manual
+              ? const Color(0xFFE6F1EE)
+              : const Color(0xFFFBE5DF),
+          borderRadius: BorderRadius.circular(12),
+        ),
         child: Icon(
-          bill.manual ? Icons.add_card : Icons.receipt_long,
-          color: bill.manual ? green : pink,
+          bill.manual ? Icons.add_card_outlined : Icons.receipt_long_outlined,
+          color: bill.manual ? ledgerTeal : vermilion,
+          size: 20,
         ),
       ),
       title: Text(
         bill.customer.isEmpty
             ? (bill.manual ? 'Other income' : 'Customer')
             : bill.customer,
-        style: const TextStyle(fontWeight: FontWeight.w700),
+        style: const TextStyle(
+          fontWeight: FontWeight.w700,
+          color: ledgerInk,
+          fontSize: 14,
+        ),
       ),
-      subtitle: Text(
-        '${bill.manual ? 'Manual entry' : 'Invoice'} · ${DateFormat('d MMM yyyy').format(bill.date)}',
+      subtitle: Padding(
+        padding: const EdgeInsets.only(top: 4),
+        child: Text(
+          '${bill.manual ? 'Manual entry' : 'Invoice'}  ·  ${DateFormat('d MMM yyyy').format(bill.date)}',
+          style: const TextStyle(color: ledgerMuted, fontSize: 11),
+        ),
       ),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
             money.format(bill.total),
-            style: const TextStyle(fontWeight: FontWeight.w800),
+            style: const TextStyle(
+              fontWeight: FontWeight.w800,
+              color: ledgerInk,
+              fontSize: 12,
+            ),
           ),
           PopupMenuButton<String>(
             onSelected: (v) async {
@@ -952,47 +1091,115 @@ class _HistoryPageState extends State<HistoryPage> {
           )
           .toList();
       return Scaffold(
-        appBar: AppBar(title: const Text('Bill history')),
-        body: Column(
+        body: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 0, 18, 8),
-              child: TextField(
-                onChanged: (v) => setState(() => query = v),
-                decoration: const InputDecoration(
-                  prefixIcon: Icon(Icons.search),
-                  hintText: 'Search customer or phone',
-                ),
+            const Text(
+              'THE LEDGER',
+              style: TextStyle(
+                color: vermilion,
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.5,
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 18),
+            const SizedBox(height: 5),
+            const Text(
+              'Bills & income',
+              style: TextStyle(
+                color: ledgerInk,
+                fontSize: 28,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -.7,
+              ),
+            ),
+            const SizedBox(height: 5),
+            const Text(
+              'Every transaction, in one place.',
+              style: TextStyle(color: ledgerMuted, fontSize: 13),
+            ),
+            const SizedBox(height: 18),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: ledgerSurface,
+                border: Border.all(color: ledgerBorder),
+                borderRadius: BorderRadius.circular(17),
+              ),
               child: Row(
                 children: [
-                  const Text('Show manual income'),
-                  const Spacer(),
-                  Switch(
-                    value: incomeOnly,
-                    onChanged: (v) => setState(() => incomeOnly = v),
+                  Expanded(
+                    child: _MetricMini(
+                      label: 'RECORDS',
+                      value: '${store.bills.length}',
+                      color: ledgerInk,
+                    ),
+                  ),
+                  Container(width: 1, height: 40, color: ledgerBorder),
+                  Expanded(
+                    child: _MetricMini(
+                      label: 'ALL TIME',
+                      value: money.format(
+                        store.bills.fold<double>(0, (sum, b) => sum + b.total),
+                      ),
+                      color: vermilion,
+                    ),
                   ),
                 ],
               ),
             ),
-            Expanded(
-              child: list.isEmpty
-                  ? const Center(
-                      child: _EmptyState(text: 'No matching bills yet.'),
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
-                      itemCount: list.length,
-                      itemBuilder: (_, i) => BillTile(
-                        bill: list[i],
-                        onTap: () => showBillPreview(context, list[i]),
-                        onDelete: () => store.remove(list[i]),
-                      ),
-                    ),
+            const SizedBox(height: 16),
+            TextField(
+              onChanged: (v) => setState(() => query = v),
+              decoration: InputDecoration(
+                prefixIcon: const Icon(Icons.search, color: ledgerMuted),
+                hintText: 'Search name or phone',
+                hintStyle: const TextStyle(color: ledgerMuted, fontSize: 13),
+                filled: true,
+                fillColor: ledgerSurface,
+                contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: ledgerBorder),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: const BorderSide(color: ledgerBorder),
+                ),
+              ),
             ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                _FilterChip(
+                  label: 'All records',
+                  selected: !incomeOnly,
+                  onTap: () => setState(() => incomeOnly = false),
+                ),
+                const SizedBox(width: 8),
+                _FilterChip(
+                  label: 'Manual income',
+                  selected: incomeOnly,
+                  onTap: () => setState(() => incomeOnly = true),
+                ),
+                const Spacer(),
+                Text(
+                  '${list.length} shown',
+                  style: const TextStyle(color: ledgerMuted, fontSize: 11),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            if (list.isEmpty)
+              const _EmptyState(text: 'No matching bills yet.')
+            else
+              ...list.map(
+                (bill) => BillTile(
+                  bill: bill,
+                  onTap: () => showBillPreview(context, bill),
+                  onDelete: () => store.remove(bill),
+                ),
+              ),
           ],
         ),
       );
@@ -1001,274 +1208,1126 @@ class _HistoryPageState extends State<HistoryPage> {
 }
 
 class AnalyticsPage extends StatefulWidget {
-  const AnalyticsPage({super.key});
+  const AnalyticsPage({super.key, required this.onManual});
+  final VoidCallback onManual;
   @override
   State<AnalyticsPage> createState() => _AnalyticsPageState();
 }
 
 class _AnalyticsPageState extends State<AnalyticsPage> {
   DateTime month = DateTime(DateTime.now().year, DateTime.now().month);
+  bool weeklyView = false;
+  int selectedWeek = 0;
+
   @override
-  Widget build(BuildContext context) {
-    final monthBills = store.bills
-        .where((b) => b.date.year == month.year && b.date.month == month.month)
-        .toList();
-    final monthly = monthBills.fold<double>(0, (s, b) => s + b.total);
-    final buckets = List<double>.filled(5, 0);
-    for (final b in monthBills) {
-      buckets[((b.date.day - 1) ~/ 7).clamp(0, 4)] += b.total;
-    }
-    final maxY = (buckets.fold<double>(0, (a, b) => a > b ? a : b) * 1.25)
-        .clamp(100, double.infinity)
-        .toDouble();
-    final now = DateTime.now();
-    final months = List.generate(
-      6,
-      (i) => DateTime(now.year, now.month - 5 + i),
-    );
-    final monthValues = months
-        .map(
-          (m) => store.bills
-              .where((b) => b.date.year == m.year && b.date.month == m.month)
-              .fold<double>(0, (s, b) => s + b.total),
-        )
-        .toList();
-    return AnimatedBuilder(
-      animation: store,
-      builder: (_, _) => Scaffold(
-        appBar: AppBar(title: const Text('Business analysis')),
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: store,
+    builder: (_, _) {
+      final monthBills = store.bills
+          .where(
+            (b) => b.date.year == month.year && b.date.month == month.month,
+          )
+          .toList();
+      final monthly = monthBills.fold<double>(0, (s, b) => s + b.total);
+      final daysInMonth = DateUtils.getDaysInMonth(month.year, month.month);
+      final weekCount = (daysInMonth + 6) ~/ 7;
+      final selectedWeekIndex = selectedWeek.clamp(0, weekCount - 1);
+      final weeklyTotals = List<double>.generate(weekCount, (i) {
+        final start = i * 7 + 1;
+        final end = (start + 6).clamp(start, daysInMonth);
+        return monthBills
+            .where((b) => b.date.day >= start && b.date.day <= end)
+            .fold<double>(0, (sum, b) => sum + b.total);
+      });
+      final weekStart = selectedWeekIndex * 7 + 1;
+      final weekEnd = (weekStart + 6).clamp(weekStart, daysInMonth);
+      final chartLabels = weeklyView
+          ? List.generate(weekEnd - weekStart + 1, (i) {
+              final date = DateTime(month.year, month.month, weekStart + i);
+              return DateFormat('E').format(date).substring(0, 1);
+            })
+          : List.generate(weekCount, (i) => 'W${i + 1}');
+      final chartValues = weeklyView
+          ? List<double>.generate(weekEnd - weekStart + 1, (i) {
+              final day = weekStart + i;
+              return monthBills
+                  .where((b) => b.date.day == day)
+                  .fold<double>(0, (sum, b) => sum + b.total);
+            })
+          : weeklyTotals;
+      final chartMax =
+          (chartValues.fold<double>(0, (a, b) => a > b ? a : b) * 1.25)
+              .clamp(100, double.infinity)
+              .toDouble();
+      final previousMonth = DateTime(month.year, month.month - 1);
+      final previousTotal = store.bills
+          .where(
+            (b) =>
+                b.date.year == previousMonth.year &&
+                b.date.month == previousMonth.month,
+          )
+          .fold<double>(0, (sum, b) => sum + b.total);
+      final changeText = previousTotal == 0
+          ? (monthly > 0 ? 'New this month' : 'No change yet')
+          : '${monthly >= previousTotal ? '+' : ''}${(((monthly - previousTotal) / previousTotal) * 100).toStringAsFixed(1)}% vs last month';
+      final invoiceTotal = monthBills
+          .where((b) => !b.manual)
+          .fold<double>(0, (sum, b) => sum + b.total);
+      final manualTotal = monthly - invoiceTotal;
+      final categoryTotals = <String, double>{};
+      for (final bill in monthBills) {
+        if (bill.manual) {
+          categoryTotals.update(
+            'Manual income',
+            (value) => value + bill.total,
+            ifAbsent: () => bill.total,
+          );
+          continue;
+        }
+        var itemTotal = 0.0;
+        for (final item in bill.items) {
+          final label = item.description.trim().isEmpty
+              ? 'Unlabelled item'
+              : item.description.trim();
+          itemTotal += item.amount;
+          categoryTotals.update(
+            label,
+            (value) => value + item.amount,
+            ifAbsent: () => item.amount,
+          );
+        }
+        final remainder = bill.total - itemTotal;
+        if (remainder > .009) {
+          categoryTotals.update(
+            'Other bill amount',
+            (value) => value + remainder,
+            ifAbsent: () => remainder,
+          );
+        }
+      }
+      final sortedCategories = categoryTotals.entries.toList()
+        ..sort((a, b) => b.value.compareTo(a.value));
+      const categoryColors = [
+        vermilion,
+        ledgerTeal,
+        ledgerGold,
+        ledgerLeaf,
+        Color(0xFF7886A0),
+      ];
+      final categoryRows = sortedCategories.take(4).toList();
+      final otherCategories = sortedCategories
+          .skip(4)
+          .fold<double>(0, (sum, entry) => sum + entry.value);
+      if (otherCategories > 0) {
+        categoryRows.add(MapEntry('Other', otherCategories));
+      }
+      final average = monthBills.isEmpty ? 0.0 : monthly / monthBills.length;
+      final recentMonths = List.generate(
+        6,
+        (i) => DateTime(month.year, month.month - 5 + i),
+      );
+      final recentValues = recentMonths
+          .map(
+            (m) => store.bills
+                .where((b) => b.date.year == m.year && b.date.month == m.month)
+                .fold<double>(0, (sum, b) => sum + b.total),
+          )
+          .toList();
+      final trendMax =
+          (recentValues.fold<double>(0, (a, b) => a > b ? a : b) * 1.25)
+              .clamp(100, double.infinity)
+              .toDouble();
+      final rangeText =
+          '${DateFormat('d MMM').format(DateTime(month.year, month.month, weekStart))} – ${DateFormat('d MMM').format(DateTime(month.year, month.month, weekEnd))}';
+      final selectedWeekTotal = weeklyTotals[selectedWeekIndex];
+
+      return Scaffold(
         body: ListView(
-          padding: const EdgeInsets.fromLTRB(18, 0, 18, 25),
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
           children: [
             Row(
               children: [
-                IconButton(
-                  onPressed: () => setState(
-                    () => month = DateTime(month.year, month.month - 1),
-                  ),
-                  icon: const Icon(Icons.chevron_left),
-                ),
                 Expanded(
-                  child: Center(
-                    child: Text(
-                      DateFormat('MMMM yyyy').format(month),
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 17,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      Text(
+                        'THE LEDGER',
+                        style: TextStyle(
+                          color: vermilion,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1.5,
+                        ),
                       ),
-                    ),
+                      SizedBox(height: 5),
+                      Text(
+                        'Business overview',
+                        style: TextStyle(
+                          color: ledgerInk,
+                          fontSize: 25,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -.6,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                IconButton(
-                  onPressed: month.year == now.year && month.month == now.month
-                      ? null
-                      : () => setState(
-                          () => month = DateTime(month.year, month.month + 1),
-                        ),
-                  icon: const Icon(Icons.chevron_right),
+                IconButton.filledTonal(
+                  style: IconButton.styleFrom(backgroundColor: ledgerInset),
+                  onPressed: widget.onManual,
+                  icon: const Icon(Icons.add, color: vermilion),
                 ),
               ],
             ),
-            _Section(
-              title: 'Monthly total',
+            const SizedBox(height: 16),
+            _LedgerCard(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  Row(
+                    children: [
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        onPressed: () => setState(() {
+                          month = DateTime(month.year, month.month - 1);
+                          selectedWeek = 0;
+                        }),
+                        icon: const Icon(Icons.chevron_left, color: ledgerInk),
+                      ),
+                      Expanded(
+                        child: Center(
+                          child: Text(
+                            DateFormat('MMMM yyyy').format(month),
+                            style: const TextStyle(
+                              color: ledgerInk,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        visualDensity: VisualDensity.compact,
+                        onPressed:
+                            month.year == DateTime.now().year &&
+                                month.month == DateTime.now().month
+                            ? null
+                            : () => setState(() {
+                                month = DateTime(month.year, month.month + 1);
+                                selectedWeek = 0;
+                              }),
+                        icon: const Icon(Icons.chevron_right, color: ledgerInk),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'MONTHLY INCOME',
+                    style: TextStyle(
+                      color: Color(0xFFD9CDBA),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.3,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
                   Text(
                     money.format(monthly),
                     style: const TextStyle(
-                      color: pink,
-                      fontSize: 27,
+                      color: Colors.white,
+                      fontSize: 31,
                       fontWeight: FontWeight.w800,
+                      letterSpacing: -.8,
                     ),
                   ),
-                  Text(
-                    '${monthBills.length} records · ${monthBills.where((b) => b.manual).length} manual income entries',
-                    style: const TextStyle(color: Colors.black54),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(
+                        previousTotal == 0 || monthly >= previousTotal
+                            ? Icons.trending_up
+                            : Icons.trending_down,
+                        color: const Color(0xFFFF9A82),
+                        size: 16,
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        changeText,
+                        style: const TextStyle(
+                          color: Color(0xFFFFB09D),
+                          fontSize: 12,
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        '${monthBills.length} records',
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Container(height: 1, color: const Color(0xFF3A4251)),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _DarkMetric(
+                          label: 'GENERATED BILLS',
+                          value: money.format(invoiceTotal),
+                          dot: const Color(0xFFFF927B),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _DarkMetric(
+                          label: 'MANUAL INCOME',
+                          value: money.format(manualTotal),
+                          dot: const Color(0xFF82C7B9),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
-            _Section(
-              title: 'Week by week',
-              child: SizedBox(
-                height: 190,
-                child: BarChart(
-                  BarChartData(
-                    maxY: maxY,
-                    gridData: const FlGridData(
-                      show: true,
-                      drawVerticalLine: false,
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: _LedgerCard(
+                    child: _MetricMini(
+                      label: 'BILLS THIS MONTH',
+                      value: '${monthBills.length}',
+                      color: ledgerInk,
                     ),
-                    borderData: FlBorderData(show: false),
-                    titlesData: FlTitlesData(
-                      topTitles: const AxisTitles(
-                        sideTitles: SideTitles(showTitles: false),
-                      ),
-                      rightTitles: const AxisTitles(
-                        sideTitles: SideTitles(showTitles: false),
-                      ),
-                      leftTitles: const AxisTitles(
-                        sideTitles: SideTitles(
-                          showTitles: true,
-                          reservedSize: 45,
-                        ),
-                      ),
-                      bottomTitles: AxisTitles(
-                        sideTitles: SideTitles(
-                          showTitles: true,
-                          getTitlesWidget: (v, _) => Padding(
-                            padding: const EdgeInsets.only(top: 6),
-                            child: Text(
-                              'W${v.toInt() + 1}',
-                              style: const TextStyle(fontSize: 11),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    barGroups: [
-                      for (int i = 0; i < 5; i++)
-                        BarChartGroupData(
-                          x: i,
-                          barRods: [
-                            BarChartRodData(
-                              toY: buckets[i],
-                              color: pink,
-                              width: 22,
-                              borderRadius: const BorderRadius.vertical(
-                                top: Radius.circular(5),
-                              ),
-                            ),
-                          ],
-                        ),
-                    ],
                   ),
                 ),
-              ),
-            ),
-            _Section(
-              title: 'Income sources',
-              child: SizedBox(
-                height: 180,
-                child: monthBills.isEmpty
-                    ? const Center(child: Text('No data for this month'))
-                    : Row(
-                        children: [
-                          Expanded(
-                            child: PieChart(
-                              PieChartData(
-                                sections: [
-                                  PieChartSectionData(
-                                    value: monthBills
-                                        .where((b) => !b.manual)
-                                        .fold<double>(0, (s, b) => s + b.total),
-                                    color: pink,
-                                    title: 'Bills',
-                                    radius: 52,
-                                  ),
-                                  PieChartSectionData(
-                                    value: monthBills
-                                        .where((b) => b.manual)
-                                        .fold<double>(0, (s, b) => s + b.total),
-                                    color: green,
-                                    title: 'Manual',
-                                    radius: 52,
-                                  ),
-                                ],
-                                sectionsSpace: 3,
-                                centerSpaceRadius: 35,
-                              ),
-                            ),
-                          ),
-                          const Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '●  Generated bills',
-                                style: TextStyle(color: pink),
-                              ),
-                              SizedBox(height: 12),
-                              Text(
-                                '●  Manual income',
-                                style: TextStyle(color: green),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-              ),
-            ),
-            _Section(
-              title: 'Monthly trend · last 6 months',
-              child: SizedBox(
-                height: 180,
-                child: BarChart(
-                  BarChartData(
-                    maxY:
-                        (monthValues.fold<double>(0, (a, b) => a > b ? a : b) *
-                                1.2)
-                            .clamp(100, double.infinity)
-                            .toDouble(),
-                    gridData: const FlGridData(
-                      show: true,
-                      drawVerticalLine: false,
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _LedgerCard(
+                    child: _MetricMini(
+                      label: 'AVERAGE RECORD',
+                      value: money.format(average),
+                      color: ledgerTeal,
                     ),
-                    borderData: FlBorderData(show: false),
-                    titlesData: FlTitlesData(
-                      topTitles: const AxisTitles(
-                        sideTitles: SideTitles(showTitles: false),
-                      ),
-                      rightTitles: const AxisTitles(
-                        sideTitles: SideTitles(showTitles: false),
-                      ),
-                      leftTitles: const AxisTitles(
-                        sideTitles: SideTitles(showTitles: false),
-                      ),
-                      bottomTitles: AxisTitles(
-                        sideTitles: SideTitles(
-                          showTitles: true,
-                          getTitlesWidget: (v, _) {
-                            final i = v.toInt();
-                            return i >= 0 && i < months.length
-                                ? Padding(
-                                    padding: const EdgeInsets.only(top: 6),
-                                    child: Text(
-                                      DateFormat('MMM').format(months[i]),
-                                      style: const TextStyle(fontSize: 10),
-                                    ),
-                                  )
-                                : const SizedBox();
-                          },
-                        ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 17),
+            Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'Income rhythm',
+                    style: TextStyle(
+                      color: ledgerInk,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 18,
+                    ),
+                  ),
+                ),
+                SegmentedButton<bool>(
+                  showSelectedIcon: false,
+                  style: ButtonStyle(
+                    visualDensity: VisualDensity.compact,
+                    textStyle: WidgetStateProperty.all(
+                      const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                    barGroups: [
-                      for (int i = 0; i < months.length; i++)
-                        BarChartGroupData(
-                          x: i,
-                          barRods: [
-                            BarChartRodData(
-                              toY: monthValues[i],
-                              color: green,
-                              width: 17,
-                              borderRadius: const BorderRadius.vertical(
-                                top: Radius.circular(5),
-                              ),
-                            ),
-                          ],
+                    padding: WidgetStateProperty.all(
+                      const EdgeInsets.symmetric(horizontal: 10),
+                    ),
+                    backgroundColor: WidgetStateProperty.resolveWith(
+                      (states) => states.contains(WidgetState.selected)
+                          ? const Color(0xFFFBE5DF)
+                          : ledgerSurface,
+                    ),
+                    foregroundColor: WidgetStateProperty.all(ledgerInk),
+                  ),
+                  segments: const [
+                    ButtonSegment(value: false, label: Text('Month')),
+                    ButtonSegment(value: true, label: Text('Week')),
+                  ],
+                  selected: {weeklyView},
+                  onSelectionChanged: (selection) => setState(() {
+                    weeklyView = selection.first;
+                  }),
+                ),
+              ],
+            ),
+            const SizedBox(height: 9),
+            _LedgerCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          weeklyView ? 'Daily income' : 'Week by week',
+                          style: const TextStyle(
+                            color: ledgerInk,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15,
+                          ),
                         ),
+                      ),
+                      Text(
+                        weeklyView
+                            ? rangeText
+                            : DateFormat('MMM').format(month),
+                        style: const TextStyle(
+                          color: ledgerMuted,
+                          fontSize: 11,
+                        ),
+                      ),
                     ],
                   ),
+                  if (weeklyView) ...[
+                    const SizedBox(height: 5),
+                    Row(
+                      children: [
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          onPressed: selectedWeekIndex == 0
+                              ? null
+                              : () => setState(() => selectedWeek--),
+                          icon: const Icon(Icons.chevron_left, size: 19),
+                        ),
+                        Text(
+                          'Week ${selectedWeek + 1} · ${money.format(selectedWeekTotal)}',
+                          style: const TextStyle(
+                            color: ledgerMuted,
+                            fontSize: 11,
+                          ),
+                        ),
+                        IconButton(
+                          visualDensity: VisualDensity.compact,
+                          onPressed: selectedWeekIndex >= weekCount - 1
+                              ? null
+                              : () => setState(() => selectedWeek++),
+                          icon: const Icon(Icons.chevron_right, size: 19),
+                        ),
+                      ],
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    height: 176,
+                    child: chartValues.isEmpty
+                        ? const Center(child: Text('No data for this period'))
+                        : BarChart(
+                            BarChartData(
+                              maxY: chartMax,
+                              alignment: BarChartAlignment.spaceAround,
+                              gridData: FlGridData(
+                                show: true,
+                                drawVerticalLine: false,
+                                getDrawingHorizontalLine: (_) => const FlLine(
+                                  color: ledgerBorder,
+                                  strokeWidth: 1,
+                                ),
+                              ),
+                              borderData: FlBorderData(show: false),
+                              barTouchData: BarTouchData(
+                                touchTooltipData: BarTouchTooltipData(
+                                  getTooltipItem:
+                                      (group, groupIndex, rod, rodIndex) =>
+                                          BarTooltipItem(
+                                            money.format(rod.toY),
+                                            const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                ),
+                              ),
+                              titlesData: FlTitlesData(
+                                topTitles: const AxisTitles(
+                                  sideTitles: SideTitles(showTitles: false),
+                                ),
+                                rightTitles: const AxisTitles(
+                                  sideTitles: SideTitles(showTitles: false),
+                                ),
+                                leftTitles: const AxisTitles(
+                                  sideTitles: SideTitles(showTitles: false),
+                                ),
+                                bottomTitles: AxisTitles(
+                                  sideTitles: SideTitles(
+                                    showTitles: true,
+                                    reservedSize: 24,
+                                    getTitlesWidget: (v, _) {
+                                      final i = v.toInt();
+                                      return i >= 0 && i < chartLabels.length
+                                          ? Padding(
+                                              padding: const EdgeInsets.only(
+                                                top: 6,
+                                              ),
+                                              child: Text(
+                                                chartLabels[i],
+                                                style: const TextStyle(
+                                                  color: ledgerMuted,
+                                                  fontSize: 10,
+                                                ),
+                                              ),
+                                            )
+                                          : const SizedBox();
+                                    },
+                                  ),
+                                ),
+                              ),
+                              barGroups: [
+                                for (int i = 0; i < chartValues.length; i++)
+                                  BarChartGroupData(
+                                    x: i,
+                                    barRods: [
+                                      BarChartRodData(
+                                        toY: chartValues[i],
+                                        color: weeklyView
+                                            ? ledgerTeal
+                                            : vermilion,
+                                        width: weeklyView ? 14 : 24,
+                                        borderRadius:
+                                            const BorderRadius.vertical(
+                                              top: Radius.circular(6),
+                                            ),
+                                      ),
+                                    ],
+                                  ),
+                              ],
+                            ),
+                          ),
+                  ),
+                  if (!weeklyView) ...[
+                    const SizedBox(height: 5),
+                    for (int i = 0; i < weeklyTotals.length; i++)
+                      _WeekRow(
+                        label: 'Week ${i + 1}',
+                        range:
+                            '${i * 7 + 1}–${(i * 7 + 7).clamp(i * 7 + 1, daysInMonth)} ${DateFormat('MMM').format(month)}',
+                        value: weeklyTotals[i],
+                        maximum: monthly,
+                        active: i == selectedWeekIndex,
+                        onTap: () => setState(() {
+                          selectedWeek = i;
+                          weeklyView = true;
+                        }),
+                      ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            _LedgerCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Income by item & entry type',
+                    style: TextStyle(
+                      color: ledgerInk,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 15),
+                  if (monthly == 0 || categoryRows.isEmpty)
+                    const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(20),
+                        child: Text(
+                          'No income recorded for this month',
+                          style: TextStyle(color: ledgerMuted),
+                        ),
+                      ),
+                    )
+                  else
+                    Row(
+                      children: [
+                        SizedBox(
+                          width: 142,
+                          height: 142,
+                          child: PieChart(
+                            PieChartData(
+                              sectionsSpace: 3,
+                              centerSpaceRadius: 39,
+                              sections: [
+                                for (int i = 0; i < categoryRows.length; i++)
+                                  PieChartSectionData(
+                                    value: categoryRows[i].value,
+                                    color: categoryColors[i],
+                                    title:
+                                        '${(categoryRows[i].value / monthly * 100).round()}%',
+                                    radius: 26,
+                                    titleStyle: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            children: [
+                              for (int i = 0; i < categoryRows.length; i++) ...[
+                                if (i > 0) const SizedBox(height: 10),
+                                _SourceLegend(
+                                  label: categoryRows[i].key,
+                                  amount: categoryRows[i].value,
+                                  color: categoryColors[i],
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            _LedgerCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Six month trend',
+                    style: TextStyle(
+                      color: ledgerInk,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    height: 155,
+                    child: BarChart(
+                      BarChartData(
+                        maxY: trendMax,
+                        alignment: BarChartAlignment.spaceAround,
+                        gridData: FlGridData(
+                          show: true,
+                          drawVerticalLine: false,
+                          getDrawingHorizontalLine: (_) =>
+                              const FlLine(color: ledgerBorder, strokeWidth: 1),
+                        ),
+                        borderData: FlBorderData(show: false),
+                        titlesData: FlTitlesData(
+                          topTitles: const AxisTitles(
+                            sideTitles: SideTitles(showTitles: false),
+                          ),
+                          rightTitles: const AxisTitles(
+                            sideTitles: SideTitles(showTitles: false),
+                          ),
+                          leftTitles: const AxisTitles(
+                            sideTitles: SideTitles(showTitles: false),
+                          ),
+                          bottomTitles: AxisTitles(
+                            sideTitles: SideTitles(
+                              showTitles: true,
+                              reservedSize: 24,
+                              getTitlesWidget: (v, _) {
+                                final i = v.toInt();
+                                return i >= 0 && i < recentMonths.length
+                                    ? Padding(
+                                        padding: const EdgeInsets.only(top: 5),
+                                        child: Text(
+                                          DateFormat('MMM')
+                                              .format(recentMonths[i]),
+                                          style: const TextStyle(
+                                            color: ledgerMuted,
+                                            fontSize: 10,
+                                          ),
+                                        ),
+                                      )
+                                    : const SizedBox();
+                              },
+                            ),
+                          ),
+                        ),
+                        barGroups: [
+                          for (int i = 0; i < recentValues.length; i++)
+                            BarChartGroupData(
+                              x: i,
+                              barRods: [
+                                BarChartRodData(
+                                  toY: recentValues[i],
+                                  color: i == recentValues.length - 1
+                                      ? vermilion
+                                      : ledgerLeaf,
+                                  width: 17,
+                                  borderRadius: const BorderRadius.vertical(
+                                    top: Radius.circular(5),
+                                  ),
+                                ),
+                              ],
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: widget.onManual,
+              style: FilledButton.styleFrom(
+                backgroundColor: vermilion,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 15),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+              icon: const Icon(Icons.add_card_outlined),
+              label: const Text(
+                'Record new income',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+          ],
+        ),
+      );
+    },
+  );
+}
+
+class SettingsPage extends StatelessWidget {
+  const SettingsPage({super.key});
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    body: ListView(
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 30),
+      children: [
+        const Text(
+          'YOUR WORKSPACE',
+          style: TextStyle(
+            color: vermilion,
+            fontSize: 10,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 1.5,
+          ),
+        ),
+        const SizedBox(height: 5),
+        const Text(
+          'Settings',
+          style: TextStyle(
+            color: ledgerInk,
+            fontSize: 28,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -.7,
+          ),
+        ),
+        const SizedBox(height: 5),
+        const Text(
+          'Your shop details and app preferences.',
+          style: TextStyle(color: ledgerMuted, fontSize: 13),
+        ),
+        const SizedBox(height: 20),
+        _LedgerCard(
+          child: Row(
+            children: [
+              Container(
+                width: 54,
+                height: 54,
+                decoration: BoxDecoration(
+                  color: ledgerInset,
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Image.asset(
+                  'assets/vin.jpg',
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) =>
+                      const Icon(Icons.content_cut, color: vermilion),
+                ),
+              ),
+              const SizedBox(width: 14),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'GM TAILORS',
+                      style: TextStyle(
+                        color: ledgerInk,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: .8,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Morai, Chennai',
+                      style: TextStyle(color: ledgerMuted, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.checkroom_outlined, color: ledgerTeal),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        _SettingsRow(
+          icon: Icons.translate,
+          title: 'Invoice language',
+          subtitle: 'Choose English or Tamil when creating each bill',
+        ),
+        _SettingsRow(
+          icon: Icons.storage_outlined,
+          title: 'Your bill records',
+          subtitle: 'Saved on this device and available in History',
+        ),
+        _SettingsRow(
+          icon: Icons.picture_as_pdf_outlined,
+          title: 'Bill template',
+          subtitle: 'Original GM Tailors invoice layout is preserved',
+        ),
+        const SizedBox(height: 16),
+        const Center(
+          child: Text(
+            'GM Tailors Bills  ·  Version 1.0.0',
+            style: TextStyle(color: ledgerMuted, fontSize: 11),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _SettingsRow extends StatelessWidget {
+  const _SettingsRow({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+  final IconData icon;
+  final String title, subtitle;
+  @override
+  Widget build(BuildContext context) => Container(
+    margin: const EdgeInsets.only(bottom: 9),
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: ledgerSurface,
+      border: Border.all(color: ledgerBorder),
+      borderRadius: BorderRadius.circular(15),
+    ),
+    child: Row(
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: ledgerInset,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, color: vermilion, size: 19),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  color: ledgerInk,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                subtitle,
+                style: const TextStyle(color: ledgerMuted, fontSize: 11),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _LedgerCard extends StatelessWidget {
+  const _LedgerCard({required this.child});
+  final Widget child;
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: ledgerSurface,
+      border: Border.all(color: ledgerBorder),
+      borderRadius: BorderRadius.circular(17),
+      boxShadow: const [
+        BoxShadow(
+          color: Color(0x0A141B2D),
+          blurRadius: 7,
+          offset: Offset(0, 2),
+        ),
+      ],
+    ),
+    child: child,
+  );
+}
+
+class _MetricMini extends StatelessWidget {
+  const _MetricMini({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+  final String label, value;
+  final Color color;
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 10),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: ledgerMuted,
+            fontSize: 9,
+            fontWeight: FontWeight.w700,
+            letterSpacing: .7,
+          ),
+        ),
+        const SizedBox(height: 5),
+        FittedBox(
+          alignment: Alignment.centerLeft,
+          fit: BoxFit.scaleDown,
+          child: Text(
+            value,
+            style: TextStyle(
+              color: color,
+              fontWeight: FontWeight.w800,
+              fontSize: 17,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _DarkMetric extends StatelessWidget {
+  const _DarkMetric({
+    required this.label,
+    required this.value,
+    required this.dot,
+  });
+  final String label, value;
+  final Color dot;
+  @override
+  Widget build(BuildContext context) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Padding(
+        padding: const EdgeInsets.only(top: 4),
+        child: Container(
+          width: 7,
+          height: 7,
+          decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
+        ),
+      ),
+      const SizedBox(width: 7),
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white60,
+                fontSize: 8,
+                fontWeight: FontWeight.w700,
+                letterSpacing: .7,
+              ),
+            ),
+            const SizedBox(height: 4),
+            FittedBox(
+              alignment: Alignment.centerLeft,
+              fit: BoxFit.scaleDown,
+              child: Text(
+                value,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ),
           ],
         ),
       ),
-    );
-  }
+    ],
+  );
+}
+
+class _SourceLegend extends StatelessWidget {
+  const _SourceLegend({
+    required this.label,
+    required this.amount,
+    required this.color,
+  });
+  final String label;
+  final double amount;
+  final Color color;
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      Container(
+        width: 9,
+        height: 9,
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+      ),
+      const SizedBox(width: 7),
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(color: ledgerMuted, fontSize: 10),
+            ),
+            const SizedBox(height: 3),
+            FittedBox(
+              alignment: Alignment.centerLeft,
+              fit: BoxFit.scaleDown,
+              child: Text(
+                money.format(amount),
+                style: const TextStyle(
+                  color: ledgerInk,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ],
+  );
+}
+
+class _WeekRow extends StatelessWidget {
+  const _WeekRow({
+    required this.label,
+    required this.range,
+    required this.value,
+    required this.maximum,
+    required this.active,
+    required this.onTap,
+  });
+  final String label, range;
+  final double value, maximum;
+  final bool active;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(10),
+    child: Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 54,
+            child: Text(
+              label,
+              style: TextStyle(
+                color: active ? vermilion : ledgerInk,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  range,
+                  style: const TextStyle(color: ledgerMuted, fontSize: 9),
+                ),
+                const SizedBox(height: 4),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(5),
+                  child: LinearProgressIndicator(
+                    value: maximum == 0 ? 0 : (value / maximum).clamp(0, 1),
+                    minHeight: 4,
+                    backgroundColor: ledgerInset,
+                    color: active ? vermilion : ledgerTeal,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 9),
+          SizedBox(
+            width: 85,
+            child: Text(
+              money.format(value),
+              textAlign: TextAlign.right,
+              style: const TextStyle(
+                color: ledgerInk,
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _FilterChip extends StatelessWidget {
+  const _FilterChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(20),
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+      decoration: BoxDecoration(
+        color: selected ? ledgerInk : ledgerSurface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: selected ? ledgerInk : ledgerBorder),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: selected ? Colors.white : ledgerMuted,
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    ),
+  );
 }
 
 Future<void> showBillPreview(BuildContext context, Bill bill) async {
