@@ -1,27 +1,25 @@
 import 'dart:convert';
+import 'dart:ui' as ui;
 
 import 'package:fl_chart/fl_chart.dart';
+import 'package:file_saver/file_saver.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:share_plus/share_plus.dart';
+
+import 'app_preferences.dart';
 
 const pink = Color(0xFFE91E63);
 const green = Color(0xFF8BC34A);
 const ink = Color(0xFF242A35);
-const ledgerCanvas = Color(0xFFFBF9F5);
-const ledgerSurface = Color(0xFFFFFFFF);
-const ledgerInset = Color(0xFFF5F1E9);
-const ledgerBorder = Color(0xFFE7E2D8);
-const ledgerInk = Color(0xFF141B2D);
-const ledgerMuted = Color(0xFF6F7785);
-const vermilion = Color(0xFFD9381E);
-const ledgerTeal = Color(0xFF238C87);
-const ledgerGold = Color(0xFFD3A343);
-const ledgerLeaf = Color(0xFF75A66A);
+const heroSurface = Color(0xFF141B2D);
 const rupees = '₹';
 final money = NumberFormat.currency(
   locale: 'en_IN',
@@ -132,51 +130,66 @@ class BillStore extends ChangeNotifier {
 final store = BillStore();
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await appPreferences.load();
   await store.load();
-  runApp(const GmApp());
+  runApp(GmApp());
 }
 
 class GmApp extends StatelessWidget {
-  const GmApp({super.key});
+  GmApp({super.key});
   @override
-  Widget build(BuildContext context) => MaterialApp(
-    title: 'GM Tailors Bills',
-    debugShowCheckedModeBanner: false,
-    theme: ThemeData(
-      useMaterial3: true,
-      scaffoldBackgroundColor: ledgerCanvas,
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: vermilion,
-        surface: ledgerCanvas,
-      ),
-      appBarTheme: const AppBarTheme(
-        backgroundColor: ledgerCanvas,
-        foregroundColor: ledgerInk,
-        centerTitle: false,
-      ),
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: ledgerSurface,
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 14,
-          vertical: 13,
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: appPreferences,
+    builder: (_, _) {
+      final colors = appPreferences.palette;
+      return MaterialApp(
+        title: 'GM Tailors Bills',
+        debugShowCheckedModeBanner: false,
+        locale: Locale(appPreferences.language),
+        supportedLocales: [Locale('en'), Locale('ta')],
+        localizationsDelegates: [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        theme: ThemeData(
+          useMaterial3: true,
+          brightness: colors.isDark ? Brightness.dark : Brightness.light,
+          fontFamily: 'NotoSansTamil',
+          fontFamilyFallback: ['Roboto'],
+          scaffoldBackgroundColor: colors.canvas,
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: colors.accent,
+            surface: colors.canvas,
+            brightness: colors.isDark ? Brightness.dark : Brightness.light,
+          ),
+          appBarTheme: AppBarTheme(
+            backgroundColor: colors.canvas,
+            foregroundColor: colors.ink,
+            centerTitle: false,
+          ),
+          inputDecorationTheme: InputDecorationTheme(
+            filled: true,
+            fillColor: colors.surface,
+            contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: colors.border),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: colors.border),
+            ),
+          ),
         ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: ledgerBorder),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: ledgerBorder),
-        ),
-      ),
-    ),
-    home: const HomeShell(),
+        home: HomeShell(),
+      );
+    },
   );
 }
 
 class HomeShell extends StatefulWidget {
-  const HomeShell({super.key});
+  HomeShell({super.key});
   @override
   State<HomeShell> createState() => _HomeShellState();
 }
@@ -207,7 +220,7 @@ class _HomeShellState extends State<HomeShell> {
       ),
       HistoryPage(onEdit: (b) => create(bill: b)),
       AnalyticsPage(onManual: () => create(manual: true)),
-      const SettingsPage(),
+      SettingsPage(),
     ];
     return Scaffold(
       body: SafeArea(
@@ -218,30 +231,33 @@ class _HomeShellState extends State<HomeShell> {
               onPressed: () => create(),
               backgroundColor: vermilion,
               foregroundColor: Colors.white,
-              icon: const Icon(Icons.add),
-              label: const Text('New bill'),
+              icon: Icon(Icons.add),
+              label: Text(tx('New bill')),
             )
           : null,
       bottomNavigationBar: NavigationBar(
         backgroundColor: ledgerSurface,
-        indicatorColor: const Color(0xFFFBE5DF),
+        indicatorColor: Color(0xFFFBE5DF),
         elevation: 0,
         selectedIndex: tab,
         onDestinationSelected: (v) => setState(() => tab = v),
-        destinations: const [
+        destinations: [
           NavigationDestination(
             icon: Icon(Icons.receipt_long_outlined),
             selectedIcon: Icon(Icons.receipt_long),
-            label: 'Home',
+            label: tx('Home'),
           ),
-          NavigationDestination(icon: Icon(Icons.history), label: 'History'),
+          NavigationDestination(
+            icon: Icon(Icons.history),
+            label: tx('History'),
+          ),
           NavigationDestination(
             icon: Icon(Icons.insights_outlined),
-            label: 'Analysis',
+            label: tx('Analysis'),
           ),
           NavigationDestination(
             icon: Icon(Icons.tune_outlined),
-            label: 'Settings',
+            label: tx('Settings'),
           ),
         ],
       ),
@@ -250,7 +266,7 @@ class _HomeShellState extends State<HomeShell> {
 }
 
 class Dashboard extends StatelessWidget {
-  const Dashboard({
+  Dashboard({
     super.key,
     required this.onCreate,
     required this.onManual,
@@ -271,7 +287,7 @@ class Dashboard extends StatelessWidget {
       return CustomScrollView(
         slivers: [
           SliverPadding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
+            padding: EdgeInsets.fromLTRB(20, 20, 20, 100),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
                 Row(
@@ -286,22 +302,19 @@ class Dashboard extends StatelessWidget {
                       ),
                       clipBehavior: Clip.antiAlias,
                       child: Image.asset(
-                        'assets/vin.jpg',
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) => const Icon(
-                          Icons.content_cut,
-                          color: vermilion,
-                          size: 25,
-                        ),
+                        'assets/gm_brand.png',
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, _, _) =>
+                            Icon(Icons.content_cut, color: vermilion, size: 25),
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    const Expanded(
+                    SizedBox(width: 12),
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'GM TAILORS',
+                            tx('GM TAILORS'),
                             style: TextStyle(
                               fontSize: 17,
                               fontWeight: FontWeight.w800,
@@ -310,7 +323,7 @@ class Dashboard extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            'Your business, well measured.',
+                            tx('Your business, well measured.'),
                             style: TextStyle(color: ledgerMuted, fontSize: 12),
                           ),
                         ],
@@ -322,83 +335,83 @@ class Dashboard extends StatelessWidget {
                         foregroundColor: ledgerInk,
                       ),
                       onPressed: onHistory,
-                      icon: const Icon(Icons.receipt_long_outlined),
+                      icon: Icon(Icons.receipt_long_outlined),
                     ),
                   ],
                 ),
-                const SizedBox(height: 24),
+                SizedBox(height: 24),
                 Container(
-                  padding: const EdgeInsets.all(22),
+                  padding: EdgeInsets.all(22),
                   decoration: BoxDecoration(
-                    color: ledgerInk,
+                    color: heroSurface,
                     borderRadius: BorderRadius.circular(22),
-                    border: Border.all(color: const Color(0xFF31394A)),
+                    border: Border.all(color: Color(0xFF31394A)),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.calendar_month_outlined,
                             size: 16,
                             color: Color(0xFFD9CDBA),
                           ),
-                          const SizedBox(width: 7),
+                          SizedBox(width: 7),
                           Text(
                             DateFormat('MMMM yyyy').format(today).toUpperCase(),
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: Color(0xFFD9CDBA),
                               fontSize: 11,
                               letterSpacing: 1.1,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
-                          const Spacer(),
-                          const Icon(
+                          Spacer(),
+                          Icon(
                             Icons.ssid_chart,
                             size: 18,
                             color: Color(0xFFFF927B),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 14),
-                      const Text(
-                        'Income recorded',
+                      SizedBox(height: 14),
+                      Text(
+                        tx('Income recorded'),
                         style: TextStyle(color: Colors.white70, fontSize: 13),
                       ),
-                      const SizedBox(height: 3),
+                      SizedBox(height: 3),
                       Text(
                         money.format(total),
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: Colors.white,
                           fontSize: 32,
                           letterSpacing: -1,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      Container(height: 1, color: const Color(0xFF3A4251)),
-                      const SizedBox(height: 12),
+                      SizedBox(height: 16),
+                      Container(height: 1, color: Color(0xFF3A4251)),
+                      SizedBox(height: 12),
                       Row(
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.receipt_long_outlined,
                             size: 16,
                             color: Color(0xFFFF927B),
                           ),
-                          const SizedBox(width: 7),
+                          SizedBox(width: 7),
                           Text(
                             '${monthBills.length} records this month',
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: Colors.white70,
                               fontSize: 12,
                             ),
                           ),
-                          const Spacer(),
+                          Spacer(),
                           Text(
                             '${monthBills.where((b) => b.manual).length} manual',
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: Color(0xFF9DD3C8),
                               fontSize: 12,
                             ),
@@ -408,39 +421,39 @@ class Dashboard extends StatelessWidget {
                     ],
                   ),
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: 16),
                 Row(
                   children: [
                     Expanded(
                       child: _ActionCard(
                         icon: Icons.add_to_photos_outlined,
-                        title: 'Create bill',
-                        subtitle: 'Build an invoice',
+                        title: tx('Create bill'),
+                        subtitle: tx('Build an invoice'),
                         color: vermilion,
                         onTap: onCreate,
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    SizedBox(width: 12),
                     Expanded(
                       child: _ActionCard(
                         icon: Icons.add_card_outlined,
-                        title: 'Add income',
-                        subtitle: 'Record without a bill',
+                        title: tx('Add income'),
+                        subtitle: tx('Record without a bill'),
                         color: ledgerTeal,
                         onTap: onManual,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 27),
+                SizedBox(height: 27),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Column(
+                    Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Recent activity',
+                          tx('Recent activity'),
                           style: TextStyle(
                             fontWeight: FontWeight.w800,
                             fontSize: 20,
@@ -449,7 +462,7 @@ class Dashboard extends StatelessWidget {
                         ),
                         SizedBox(height: 3),
                         Text(
-                          'A running record of your shop',
+                          tx('A running record of your shop'),
                           style: TextStyle(color: ledgerMuted, fontSize: 12),
                         ),
                       ],
@@ -457,14 +470,14 @@ class Dashboard extends StatelessWidget {
                     TextButton(
                       onPressed: onHistory,
                       style: TextButton.styleFrom(foregroundColor: vermilion),
-                      child: const Text('View all'),
+                      child: Text(tx('View all')),
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: 8),
                 if (store.bills.isEmpty)
-                  const _EmptyState(
-                    text: 'Your saved bills and income will appear here.',
+                  _EmptyState(
+                    text: tx('Your saved bills and income will appear here.'),
                   )
                 else
                   ...store.bills
@@ -486,7 +499,7 @@ class Dashboard extends StatelessWidget {
 }
 
 class _ActionCard extends StatelessWidget {
-  const _ActionCard({
+  _ActionCard({
     required this.icon,
     required this.title,
     required this.subtitle,
@@ -502,7 +515,7 @@ class _ActionCard extends StatelessWidget {
     onTap: onTap,
     borderRadius: BorderRadius.circular(18),
     child: Container(
-      padding: const EdgeInsets.all(17),
+      padding: EdgeInsets.all(17),
       decoration: BoxDecoration(
         color: ledgerSurface,
         borderRadius: BorderRadius.circular(18),
@@ -512,25 +525,19 @@ class _ActionCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.all(10),
+            padding: EdgeInsets.all(10),
             decoration: BoxDecoration(
               color: color.withValues(alpha: .10),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(icon, color: color, size: 20),
           ),
-          const SizedBox(height: 13),
+          SizedBox(height: 13),
           Text(
             title,
-            style: const TextStyle(
-              fontWeight: FontWeight.w800,
-              color: ledgerInk,
-            ),
+            style: TextStyle(fontWeight: FontWeight.w800, color: ledgerInk),
           ),
-          Text(
-            subtitle,
-            style: const TextStyle(color: ledgerMuted, fontSize: 11),
-          ),
+          Text(subtitle, style: TextStyle(color: ledgerMuted, fontSize: 11)),
         ],
       ),
     ),
@@ -538,12 +545,12 @@ class _ActionCard extends StatelessWidget {
 }
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.text});
+  _EmptyState({required this.text});
   final String text;
   @override
   Widget build(BuildContext context) => Container(
-    margin: const EdgeInsets.only(top: 8),
-    padding: const EdgeInsets.all(22),
+    margin: EdgeInsets.only(top: 8),
+    padding: EdgeInsets.all(22),
     decoration: BoxDecoration(
       color: ledgerSurface,
       borderRadius: BorderRadius.circular(16),
@@ -553,14 +560,14 @@ class _EmptyState extends StatelessWidget {
       child: Text(
         text,
         textAlign: TextAlign.center,
-        style: const TextStyle(color: ledgerMuted),
+        style: TextStyle(color: ledgerMuted),
       ),
     ),
   );
 }
 
 class BillTile extends StatelessWidget {
-  const BillTile({
+  BillTile({
     super.key,
     required this.bill,
     required this.onTap,
@@ -570,22 +577,20 @@ class BillTile extends StatelessWidget {
   final VoidCallback onTap, onDelete;
   @override
   Widget build(BuildContext context) => Container(
-    margin: const EdgeInsets.only(bottom: 9),
+    margin: EdgeInsets.only(bottom: 9),
     decoration: BoxDecoration(
       color: ledgerSurface,
       border: Border.all(color: ledgerBorder),
       borderRadius: BorderRadius.circular(15),
     ),
     child: ListTile(
-      contentPadding: const EdgeInsets.fromLTRB(12, 3, 4, 3),
+      contentPadding: EdgeInsets.fromLTRB(12, 3, 4, 3),
       onTap: onTap,
       leading: Container(
         width: 42,
         height: 42,
         decoration: BoxDecoration(
-          color: bill.manual
-              ? const Color(0xFFE6F1EE)
-              : const Color(0xFFFBE5DF),
+          color: bill.manual ? Color(0xFFE6F1EE) : Color(0xFFFBE5DF),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Icon(
@@ -596,19 +601,19 @@ class BillTile extends StatelessWidget {
       ),
       title: Text(
         bill.customer.isEmpty
-            ? (bill.manual ? 'Other income' : 'Customer')
+            ? (bill.manual ? tx('Other income') : 'Customer')
             : bill.customer,
-        style: const TextStyle(
+        style: TextStyle(
           fontWeight: FontWeight.w700,
           color: ledgerInk,
           fontSize: 14,
         ),
       ),
       subtitle: Padding(
-        padding: const EdgeInsets.only(top: 4),
+        padding: EdgeInsets.only(top: 4),
         child: Text(
-          '${bill.manual ? 'Manual entry' : 'Invoice'}  ·  ${DateFormat('d MMM yyyy').format(bill.date)}',
-          style: const TextStyle(color: ledgerMuted, fontSize: 11),
+          '${bill.manual ? 'Manual entry' : tx('Invoice')}  ·  ${DateFormat('d MMM yyyy').format(bill.date)}',
+          style: TextStyle(color: ledgerMuted, fontSize: 11),
         ),
       ),
       trailing: Row(
@@ -616,7 +621,7 @@ class BillTile extends StatelessWidget {
         children: [
           Text(
             money.format(bill.total),
-            style: const TextStyle(
+            style: TextStyle(
               fontWeight: FontWeight.w800,
               color: ledgerInk,
               fontSize: 12,
@@ -628,16 +633,16 @@ class BillTile extends StatelessWidget {
                 final yes = await showDialog<bool>(
                   context: context,
                   builder: (c) => AlertDialog(
-                    title: const Text('Delete this record?'),
-                    content: const Text('This cannot be undone.'),
+                    title: Text(tx('Delete this record?')),
+                    content: Text(tx('This cannot be undone.')),
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.pop(c, false),
-                        child: const Text('Cancel'),
+                        child: Text(tx('Cancel')),
                       ),
                       FilledButton(
                         onPressed: () => Navigator.pop(c, true),
-                        child: const Text('Delete'),
+                        child: Text(tx('Delete')),
                       ),
                     ],
                   ),
@@ -657,8 +662,8 @@ class BillTile extends StatelessWidget {
             },
             itemBuilder: (_) => [
               if (!bill.manual)
-                const PopupMenuItem(value: 'edit', child: Text('Edit')),
-              const PopupMenuItem(value: 'delete', child: Text('Delete')),
+                PopupMenuItem(value: 'edit', child: Text(tx('Edit'))),
+              PopupMenuItem(value: 'delete', child: Text(tx('Delete'))),
             ],
           ),
         ],
@@ -668,7 +673,7 @@ class BillTile extends StatelessWidget {
 }
 
 class BillEditor extends StatefulWidget {
-  const BillEditor({super.key, this.initial, this.manual = false});
+  BillEditor({super.key, this.initial, this.manual = false});
   final Bill? initial;
   final bool manual;
   @override
@@ -688,7 +693,7 @@ class _BillEditorState extends State<BillEditor> {
   void initState() {
     super.initState();
     final b = widget.initial;
-    tamil = b?.tamil ?? false;
+    tamil = b?.tamil ?? appPreferences.isTamil;
     name.text = b?.customer ?? '';
     phone.text = b?.phone ?? '';
     note.text = b?.note ?? '';
@@ -747,7 +752,7 @@ class _BillEditorState extends State<BillEditor> {
       ],
     ),
     body: ListView(
-      padding: const EdgeInsets.fromLTRB(18, 4, 18, 100),
+      padding: EdgeInsets.fromLTRB(18, 4, 18, 100),
       children: [
         _Section(
           title: l('Customer details', 'வாடிக்கையாளர் விவரங்கள்'),
@@ -764,7 +769,7 @@ class _BillEditorState extends State<BillEditor> {
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: 12),
               TextField(
                 controller: phone,
                 keyboardType: TextInputType.phone,
@@ -785,14 +790,12 @@ class _BillEditorState extends State<BillEditor> {
               children: [
                 TextField(
                   controller: incomeAmount,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
-                  ),
+                  keyboardType: TextInputType.numberWithOptions(decimal: true),
                   decoration: InputDecoration(
                     labelText: l('Amount (₹)', 'தொகை (₹)'),
                   ),
                 ),
-                const SizedBox(height: 10),
+                SizedBox(height: 10),
                 TextField(
                   controller: note,
                   decoration: InputDecoration(labelText: l('Note', 'குறிப்பு')),
@@ -811,7 +814,7 @@ class _BillEditorState extends State<BillEditor> {
                     Expanded(
                       child: Text(
                         '${l('Number of items', 'பொருட்களின் எண்ணிக்கை')}: ${rows.length}',
-                        style: const TextStyle(fontWeight: FontWeight.w600),
+                        style: TextStyle(fontWeight: FontWeight.w600),
                       ),
                     ),
                     IconButton(
@@ -826,7 +829,7 @@ class _BillEditorState extends State<BillEditor> {
                               });
                             }
                           : null,
-                      icon: const Icon(Icons.remove_circle_outline),
+                      icon: Icon(Icons.remove_circle_outline),
                     ),
                     IconButton(
                       onPressed: rows.length < 15
@@ -837,7 +840,7 @@ class _BillEditorState extends State<BillEditor> {
                               });
                             }
                           : null,
-                      icon: const Icon(Icons.add_circle_outline, color: pink),
+                      icon: Icon(Icons.add_circle_outline, color: pink),
                     ),
                   ],
                 ),
@@ -865,7 +868,7 @@ class _BillEditorState extends State<BillEditor> {
                     });
                   },
                 ),
-                const SizedBox(height: 10),
+                SizedBox(height: 10),
                 ...rows.asMap().entries.map(
                   (entry) => _ItemRow(
                     index: entry.key,
@@ -889,7 +892,7 @@ class _BillEditorState extends State<BillEditor> {
                     Text(l('Total amount', 'மொத்த தொகை')),
                     Text(
                       money.format(_total()),
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: pink,
                         fontWeight: FontWeight.w800,
                         fontSize: 22,
@@ -901,7 +904,7 @@ class _BillEditorState extends State<BillEditor> {
                   alignment: Alignment.centerLeft,
                   child: Text(
                     '${l('In words', 'வார்த்தைகளில்')}: ${_amountWords(_total(), tamil)}',
-                    style: const TextStyle(color: Colors.black54, fontSize: 12),
+                    style: TextStyle(color: Colors.black54, fontSize: 12),
                   ),
                 ),
               ],
@@ -971,7 +974,7 @@ class _BillEditorState extends State<BillEditor> {
 }
 
 class _ItemRow extends StatelessWidget {
-  const _ItemRow({
+  _ItemRow({
     required this.index,
     required this.row,
     required this.tamil,
@@ -991,12 +994,12 @@ class _ItemRow extends StatelessWidget {
           decoration: InputDecoration(labelText: tamil ? ta : en),
         );
     return Container(
-      margin: const EdgeInsets.only(top: 9),
-      padding: const EdgeInsets.all(10),
+      margin: EdgeInsets.only(top: 9),
+      padding: EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF8FA),
+        color: Color(0xFFFFF8FA),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFF4BDD0)),
+        border: Border.all(color: Color(0xFFF4BDD0)),
       ),
       child: Column(
         children: [
@@ -1004,33 +1007,30 @@ class _ItemRow extends StatelessWidget {
             children: [
               Text(
                 '${tamil ? 'பொருள்' : 'Item'} ${index + 1}',
-                style: const TextStyle(
-                  fontWeight: FontWeight.w700,
-                  color: pink,
-                ),
+                style: TextStyle(fontWeight: FontWeight.w700, color: pink),
               ),
-              const Spacer(),
+              Spacer(),
               Text(
                 '$rupees${((double.tryParse(row['q']!.text) ?? 0) * (double.tryParse(row['r']!.text) ?? 0)).toStringAsFixed(2)}',
-                style: const TextStyle(fontWeight: FontWeight.w700),
+                style: TextStyle(fontWeight: FontWeight.w700),
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: 8),
           field('d', 'Description', 'விவரம்'),
-          const SizedBox(height: 8),
+          SizedBox(height: 8),
           Row(
             children: [
               Expanded(
                 child: field('q', 'Qty', 'அளவு', type: TextInputType.number),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: 8),
               Expanded(
                 child: field(
                   'r',
                   'Rate',
                   'விலை',
-                  type: const TextInputType.numberWithOptions(decimal: true),
+                  type: TextInputType.numberWithOptions(decimal: true),
                 ),
               ),
             ],
@@ -1042,13 +1042,13 @@ class _ItemRow extends StatelessWidget {
 }
 
 class _Section extends StatelessWidget {
-  const _Section({required this.title, required this.child});
+  _Section({required this.title, required this.child});
   final String title;
   final Widget child;
   @override
   Widget build(BuildContext context) => Container(
-    margin: const EdgeInsets.only(top: 14),
-    padding: const EdgeInsets.all(15),
+    margin: EdgeInsets.only(top: 14),
+    padding: EdgeInsets.all(15),
     decoration: BoxDecoration(
       color: Colors.white,
       borderRadius: BorderRadius.circular(18),
@@ -1058,9 +1058,9 @@ class _Section extends StatelessWidget {
       children: [
         Text(
           title,
-          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: 12),
         child,
       ],
     ),
@@ -1068,7 +1068,7 @@ class _Section extends StatelessWidget {
 }
 
 class HistoryPage extends StatefulWidget {
-  const HistoryPage({super.key, required this.onEdit});
+  HistoryPage({super.key, required this.onEdit});
   final ValueChanged<Bill> onEdit;
   @override
   State<HistoryPage> createState() => _HistoryPageState();
@@ -1092,9 +1092,9 @@ class _HistoryPageState extends State<HistoryPage> {
           .toList();
       return Scaffold(
         body: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 24, 20, 28),
+          padding: EdgeInsets.fromLTRB(20, 24, 20, 28),
           children: [
-            const Text(
+            Text(
               'THE LEDGER',
               style: TextStyle(
                 color: vermilion,
@@ -1103,8 +1103,8 @@ class _HistoryPageState extends State<HistoryPage> {
                 letterSpacing: 1.5,
               ),
             ),
-            const SizedBox(height: 5),
-            const Text(
+            SizedBox(height: 5),
+            Text(
               'Bills & income',
               style: TextStyle(
                 color: ledgerInk,
@@ -1113,14 +1113,14 @@ class _HistoryPageState extends State<HistoryPage> {
                 letterSpacing: -.7,
               ),
             ),
-            const SizedBox(height: 5),
-            const Text(
+            SizedBox(height: 5),
+            Text(
               'Every transaction, in one place.',
               style: TextStyle(color: ledgerMuted, fontSize: 13),
             ),
-            const SizedBox(height: 18),
+            SizedBox(height: 18),
             Container(
-              padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: ledgerSurface,
                 border: Border.all(color: ledgerBorder),
@@ -1148,27 +1148,27 @@ class _HistoryPageState extends State<HistoryPage> {
                 ],
               ),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             TextField(
               onChanged: (v) => setState(() => query = v),
               decoration: InputDecoration(
-                prefixIcon: const Icon(Icons.search, color: ledgerMuted),
+                prefixIcon: Icon(Icons.search, color: ledgerMuted),
                 hintText: 'Search name or phone',
-                hintStyle: const TextStyle(color: ledgerMuted, fontSize: 13),
+                hintStyle: TextStyle(color: ledgerMuted, fontSize: 13),
                 filled: true,
                 fillColor: ledgerSurface,
-                contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                contentPadding: EdgeInsets.symmetric(vertical: 14),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),
-                  borderSide: const BorderSide(color: ledgerBorder),
+                  borderSide: BorderSide(color: ledgerBorder),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),
-                  borderSide: const BorderSide(color: ledgerBorder),
+                  borderSide: BorderSide(color: ledgerBorder),
                 ),
               ),
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: 12),
             Row(
               children: [
                 _FilterChip(
@@ -1176,22 +1176,22 @@ class _HistoryPageState extends State<HistoryPage> {
                   selected: !incomeOnly,
                   onTap: () => setState(() => incomeOnly = false),
                 ),
-                const SizedBox(width: 8),
+                SizedBox(width: 8),
                 _FilterChip(
                   label: 'Manual income',
                   selected: incomeOnly,
                   onTap: () => setState(() => incomeOnly = true),
                 ),
-                const Spacer(),
+                Spacer(),
                 Text(
                   '${list.length} shown',
-                  style: const TextStyle(color: ledgerMuted, fontSize: 11),
+                  style: TextStyle(color: ledgerMuted, fontSize: 11),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             if (list.isEmpty)
-              const _EmptyState(text: 'No matching bills yet.')
+              _EmptyState(text: 'No matching bills yet.')
             else
               ...list.map(
                 (bill) => BillTile(
@@ -1208,7 +1208,7 @@ class _HistoryPageState extends State<HistoryPage> {
 }
 
 class AnalyticsPage extends StatefulWidget {
-  const AnalyticsPage({super.key, required this.onManual});
+  AnalyticsPage({super.key, required this.onManual});
   final VoidCallback onManual;
   @override
   State<AnalyticsPage> createState() => _AnalyticsPageState();
@@ -1268,7 +1268,7 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
           )
           .fold<double>(0, (sum, b) => sum + b.total);
       final changeText = previousTotal == 0
-          ? (monthly > 0 ? 'New this month' : 'No change yet')
+          ? (monthly > 0 ? tx('New this month') : tx('No change yet'))
           : '${monthly >= previousTotal ? '+' : ''}${(((monthly - previousTotal) / previousTotal) * 100).toStringAsFixed(1)}% vs last month';
       final invoiceTotal = monthBills
           .where((b) => !b.manual)
@@ -1278,7 +1278,7 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
       for (final bill in monthBills) {
         if (bill.manual) {
           categoryTotals.update(
-            'Manual income',
+            tx('Manual income'),
             (value) => value + bill.total,
             ifAbsent: () => bill.total,
           );
@@ -1307,7 +1307,7 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
       }
       final sortedCategories = categoryTotals.entries.toList()
         ..sort((a, b) => b.value.compareTo(a.value));
-      const categoryColors = [
+      final categoryColors = [
         vermilion,
         ledgerTeal,
         ledgerGold,
@@ -1319,7 +1319,7 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
           .skip(4)
           .fold<double>(0, (sum, entry) => sum + entry.value);
       if (otherCategories > 0) {
-        categoryRows.add(MapEntry('Other', otherCategories));
+        categoryRows.add(MapEntry(tx('Other'), otherCategories));
       }
       final average = monthBills.isEmpty ? 0.0 : monthly / monthBills.length;
       final recentMonths = List.generate(
@@ -1343,16 +1343,16 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
 
       return Scaffold(
         body: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
+          padding: EdgeInsets.fromLTRB(20, 24, 20, 32),
           children: [
             Row(
               children: [
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
+                    children: [
                       Text(
-                        'THE LEDGER',
+                        tx('THE LEDGER'),
                         style: TextStyle(
                           color: vermilion,
                           fontSize: 10,
@@ -1362,7 +1362,7 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
                       ),
                       SizedBox(height: 5),
                       Text(
-                        'Business overview',
+                        tx('Business overview'),
                         style: TextStyle(
                           color: ledgerInk,
                           fontSize: 25,
@@ -1376,11 +1376,11 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
                 IconButton.filledTonal(
                   style: IconButton.styleFrom(backgroundColor: ledgerInset),
                   onPressed: widget.onManual,
-                  icon: const Icon(Icons.add, color: vermilion),
+                  icon: Icon(Icons.add, color: vermilion),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             _LedgerCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1393,13 +1393,13 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
                           month = DateTime(month.year, month.month - 1);
                           selectedWeek = 0;
                         }),
-                        icon: const Icon(Icons.chevron_left, color: ledgerInk),
+                        icon: Icon(Icons.chevron_left, color: ledgerInk),
                       ),
                       Expanded(
                         child: Center(
                           child: Text(
                             DateFormat('MMMM yyyy').format(month),
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: ledgerInk,
                               fontWeight: FontWeight.w700,
                               fontSize: 14,
@@ -1417,13 +1417,13 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
                                 month = DateTime(month.year, month.month + 1);
                                 selectedWeek = 0;
                               }),
-                        icon: const Icon(Icons.chevron_right, color: ledgerInk),
+                        icon: Icon(Icons.chevron_right, color: ledgerInk),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'MONTHLY INCOME',
+                  SizedBox(height: 6),
+                  Text(
+                    tx('MONTHLY INCOME'),
                     style: TextStyle(
                       color: Color(0xFFD9CDBA),
                       fontSize: 10,
@@ -1431,62 +1431,59 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
                       letterSpacing: 1.3,
                     ),
                   ),
-                  const SizedBox(height: 3),
+                  SizedBox(height: 3),
                   Text(
                     money.format(monthly),
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: Colors.white,
                       fontSize: 31,
                       fontWeight: FontWeight.w800,
                       letterSpacing: -.8,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  SizedBox(height: 4),
                   Row(
                     children: [
                       Icon(
                         previousTotal == 0 || monthly >= previousTotal
                             ? Icons.trending_up
                             : Icons.trending_down,
-                        color: const Color(0xFFFF9A82),
+                        color: Color(0xFFFF9A82),
                         size: 16,
                       ),
-                      const SizedBox(width: 5),
+                      SizedBox(width: 5),
                       Text(
                         changeText,
-                        style: const TextStyle(
+                        style: TextStyle(
                           color: Color(0xFFFFB09D),
                           fontSize: 12,
                         ),
                       ),
-                      const Spacer(),
+                      Spacer(),
                       Text(
                         '${monthBills.length} records',
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 12,
-                        ),
+                        style: TextStyle(color: Colors.white70, fontSize: 12),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
-                  Container(height: 1, color: const Color(0xFF3A4251)),
-                  const SizedBox(height: 12),
+                  SizedBox(height: 16),
+                  Container(height: 1, color: Color(0xFF3A4251)),
+                  SizedBox(height: 12),
                   Row(
                     children: [
                       Expanded(
                         child: _DarkMetric(
-                          label: 'GENERATED BILLS',
+                          label: tx('GENERATED BILLS'),
                           value: money.format(invoiceTotal),
-                          dot: const Color(0xFFFF927B),
+                          dot: Color(0xFFFF927B),
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      SizedBox(width: 12),
                       Expanded(
                         child: _DarkMetric(
-                          label: 'MANUAL INCOME',
+                          label: tx('MANUAL INCOME'),
                           value: money.format(manualTotal),
-                          dot: const Color(0xFF82C7B9),
+                          dot: Color(0xFF82C7B9),
                         ),
                       ),
                     ],
@@ -1494,23 +1491,23 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
                 ],
               ),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             Row(
               children: [
                 Expanded(
                   child: _LedgerCard(
                     child: _MetricMini(
-                      label: 'BILLS THIS MONTH',
+                      label: tx('BILLS THIS MONTH'),
                       value: '${monthBills.length}',
                       color: ledgerInk,
                     ),
                   ),
                 ),
-                const SizedBox(width: 10),
+                SizedBox(width: 10),
                 Expanded(
                   child: _LedgerCard(
                     child: _MetricMini(
-                      label: 'AVERAGE RECORD',
+                      label: tx('AVERAGE RECORD'),
                       value: money.format(average),
                       color: ledgerTeal,
                     ),
@@ -1518,12 +1515,12 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
                 ),
               ],
             ),
-            const SizedBox(height: 17),
+            SizedBox(height: 17),
             Row(
               children: [
-                const Expanded(
+                Expanded(
                   child: Text(
-                    'Income rhythm',
+                    tx('Income rhythm'),
                     style: TextStyle(
                       color: ledgerInk,
                       fontWeight: FontWeight.w800,
@@ -1536,24 +1533,21 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
                   style: ButtonStyle(
                     visualDensity: VisualDensity.compact,
                     textStyle: WidgetStateProperty.all(
-                      const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
+                      TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
                     ),
                     padding: WidgetStateProperty.all(
-                      const EdgeInsets.symmetric(horizontal: 10),
+                      EdgeInsets.symmetric(horizontal: 10),
                     ),
                     backgroundColor: WidgetStateProperty.resolveWith(
                       (states) => states.contains(WidgetState.selected)
-                          ? const Color(0xFFFBE5DF)
+                          ? Color(0xFFFBE5DF)
                           : ledgerSurface,
                     ),
                     foregroundColor: WidgetStateProperty.all(ledgerInk),
                   ),
-                  segments: const [
-                    ButtonSegment(value: false, label: Text('Month')),
-                    ButtonSegment(value: true, label: Text('Week')),
+                  segments: [
+                    ButtonSegment(value: false, label: Text(tx('Month'))),
+                    ButtonSegment(value: true, label: Text(tx('Week'))),
                   ],
                   selected: {weeklyView},
                   onSelectionChanged: (selection) => setState(() {
@@ -1562,7 +1556,7 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
                 ),
               ],
             ),
-            const SizedBox(height: 9),
+            SizedBox(height: 9),
             _LedgerCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1571,8 +1565,8 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
                     children: [
                       Expanded(
                         child: Text(
-                          weeklyView ? 'Daily income' : 'Week by week',
-                          style: const TextStyle(
+                          weeklyView ? tx('Daily income') : tx('Week by week'),
+                          style: TextStyle(
                             color: ledgerInk,
                             fontWeight: FontWeight.w700,
                             fontSize: 15,
@@ -1583,15 +1577,12 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
                         weeklyView
                             ? rangeText
                             : DateFormat('MMM').format(month),
-                        style: const TextStyle(
-                          color: ledgerMuted,
-                          fontSize: 11,
-                        ),
+                        style: TextStyle(color: ledgerMuted, fontSize: 11),
                       ),
                     ],
                   ),
                   if (weeklyView) ...[
-                    const SizedBox(height: 5),
+                    SizedBox(height: 5),
                     Row(
                       children: [
                         IconButton(
@@ -1599,30 +1590,27 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
                           onPressed: selectedWeekIndex == 0
                               ? null
                               : () => setState(() => selectedWeek--),
-                          icon: const Icon(Icons.chevron_left, size: 19),
+                          icon: Icon(Icons.chevron_left, size: 19),
                         ),
                         Text(
                           'Week ${selectedWeek + 1} · ${money.format(selectedWeekTotal)}',
-                          style: const TextStyle(
-                            color: ledgerMuted,
-                            fontSize: 11,
-                          ),
+                          style: TextStyle(color: ledgerMuted, fontSize: 11),
                         ),
                         IconButton(
                           visualDensity: VisualDensity.compact,
                           onPressed: selectedWeekIndex >= weekCount - 1
                               ? null
                               : () => setState(() => selectedWeek++),
-                          icon: const Icon(Icons.chevron_right, size: 19),
+                          icon: Icon(Icons.chevron_right, size: 19),
                         ),
                       ],
                     ),
                   ],
-                  const SizedBox(height: 8),
+                  SizedBox(height: 8),
                   SizedBox(
                     height: 176,
                     child: chartValues.isEmpty
-                        ? const Center(child: Text('No data for this period'))
+                        ? Center(child: Text(tx('No data for this period')))
                         : BarChart(
                             BarChartData(
                               maxY: chartMax,
@@ -1630,10 +1618,8 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
                               gridData: FlGridData(
                                 show: true,
                                 drawVerticalLine: false,
-                                getDrawingHorizontalLine: (_) => const FlLine(
-                                  color: ledgerBorder,
-                                  strokeWidth: 1,
-                                ),
+                                getDrawingHorizontalLine: (_) =>
+                                    FlLine(color: ledgerBorder, strokeWidth: 1),
                               ),
                               borderData: FlBorderData(show: false),
                               barTouchData: BarTouchData(
@@ -1642,7 +1628,7 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
                                       (group, groupIndex, rod, rodIndex) =>
                                           BarTooltipItem(
                                             money.format(rod.toY),
-                                            const TextStyle(
+                                            TextStyle(
                                               color: Colors.white,
                                               fontSize: 11,
                                               fontWeight: FontWeight.w700,
@@ -1651,13 +1637,13 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
                                 ),
                               ),
                               titlesData: FlTitlesData(
-                                topTitles: const AxisTitles(
+                                topTitles: AxisTitles(
                                   sideTitles: SideTitles(showTitles: false),
                                 ),
-                                rightTitles: const AxisTitles(
+                                rightTitles: AxisTitles(
                                   sideTitles: SideTitles(showTitles: false),
                                 ),
-                                leftTitles: const AxisTitles(
+                                leftTitles: AxisTitles(
                                   sideTitles: SideTitles(showTitles: false),
                                 ),
                                 bottomTitles: AxisTitles(
@@ -1668,18 +1654,16 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
                                       final i = v.toInt();
                                       return i >= 0 && i < chartLabels.length
                                           ? Padding(
-                                              padding: const EdgeInsets.only(
-                                                top: 6,
-                                              ),
+                                              padding: EdgeInsets.only(top: 6),
                                               child: Text(
                                                 chartLabels[i],
-                                                style: const TextStyle(
+                                                style: TextStyle(
                                                   color: ledgerMuted,
                                                   fontSize: 10,
                                                 ),
                                               ),
                                             )
-                                          : const SizedBox();
+                                          : SizedBox();
                                     },
                                   ),
                                 ),
@@ -1695,10 +1679,9 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
                                             ? ledgerTeal
                                             : vermilion,
                                         width: weeklyView ? 14 : 24,
-                                        borderRadius:
-                                            const BorderRadius.vertical(
-                                              top: Radius.circular(6),
-                                            ),
+                                        borderRadius: BorderRadius.vertical(
+                                          top: Radius.circular(6),
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -1707,7 +1690,7 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
                           ),
                   ),
                   if (!weeklyView) ...[
-                    const SizedBox(height: 5),
+                    SizedBox(height: 5),
                     for (int i = 0; i < weeklyTotals.length; i++)
                       _WeekRow(
                         label: 'Week ${i + 1}',
@@ -1725,26 +1708,26 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
                 ],
               ),
             ),
-            const SizedBox(height: 14),
+            SizedBox(height: 14),
             _LedgerCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Income by item & entry type',
+                  Text(
+                    tx('Income by item & entry type'),
                     style: TextStyle(
                       color: ledgerInk,
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  const SizedBox(height: 15),
+                  SizedBox(height: 15),
                   if (monthly == 0 || categoryRows.isEmpty)
-                    const Center(
+                    Center(
                       child: Padding(
                         padding: EdgeInsets.all(20),
                         child: Text(
-                          'No income recorded for this month',
+                          tx('No income recorded for this month'),
                           style: TextStyle(color: ledgerMuted),
                         ),
                       ),
@@ -1767,7 +1750,7 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
                                     title:
                                         '${(categoryRows[i].value / monthly * 100).round()}%',
                                     radius: 26,
-                                    titleStyle: const TextStyle(
+                                    titleStyle: TextStyle(
                                       color: Colors.white,
                                       fontSize: 10,
                                       fontWeight: FontWeight.w700,
@@ -1777,12 +1760,12 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
                             ),
                           ),
                         ),
-                        const SizedBox(width: 14),
+                        SizedBox(width: 14),
                         Expanded(
                           child: Column(
                             children: [
                               for (int i = 0; i < categoryRows.length; i++) ...[
-                                if (i > 0) const SizedBox(height: 10),
+                                if (i > 0) SizedBox(height: 10),
                                 _SourceLegend(
                                   label: categoryRows[i].key,
                                   amount: categoryRows[i].value,
@@ -1797,20 +1780,20 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
                 ],
               ),
             ),
-            const SizedBox(height: 14),
+            SizedBox(height: 14),
             _LedgerCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Six month trend',
+                  Text(
+                    tx('Six month trend'),
                     style: TextStyle(
                       color: ledgerInk,
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  SizedBox(height: 12),
                   SizedBox(
                     height: 155,
                     child: BarChart(
@@ -1821,17 +1804,17 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
                           show: true,
                           drawVerticalLine: false,
                           getDrawingHorizontalLine: (_) =>
-                              const FlLine(color: ledgerBorder, strokeWidth: 1),
+                              FlLine(color: ledgerBorder, strokeWidth: 1),
                         ),
                         borderData: FlBorderData(show: false),
                         titlesData: FlTitlesData(
-                          topTitles: const AxisTitles(
+                          topTitles: AxisTitles(
                             sideTitles: SideTitles(showTitles: false),
                           ),
-                          rightTitles: const AxisTitles(
+                          rightTitles: AxisTitles(
                             sideTitles: SideTitles(showTitles: false),
                           ),
-                          leftTitles: const AxisTitles(
+                          leftTitles: AxisTitles(
                             sideTitles: SideTitles(showTitles: false),
                           ),
                           bottomTitles: AxisTitles(
@@ -1842,17 +1825,17 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
                                 final i = v.toInt();
                                 return i >= 0 && i < recentMonths.length
                                     ? Padding(
-                                        padding: const EdgeInsets.only(top: 5),
+                                        padding: EdgeInsets.only(top: 5),
                                         child: Text(
                                           DateFormat('MMM')
                                               .format(recentMonths[i]),
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             color: ledgerMuted,
                                             fontSize: 10,
                                           ),
                                         ),
                                       )
-                                    : const SizedBox();
+                                    : SizedBox();
                               },
                             ),
                           ),
@@ -1868,7 +1851,7 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
                                       ? vermilion
                                       : ledgerLeaf,
                                   width: 17,
-                                  borderRadius: const BorderRadius.vertical(
+                                  borderRadius: BorderRadius.vertical(
                                     top: Radius.circular(5),
                                   ),
                                 ),
@@ -1881,20 +1864,20 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
                 ],
               ),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             FilledButton.icon(
               onPressed: widget.onManual,
               style: FilledButton.styleFrom(
                 backgroundColor: vermilion,
                 foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 15),
+                padding: EdgeInsets.symmetric(vertical: 15),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),
               ),
-              icon: const Icon(Icons.add_card_outlined),
-              label: const Text(
-                'Record new income',
+              icon: Icon(Icons.add_card_outlined),
+              label: Text(
+                tx('Record new income'),
                 style: TextStyle(fontWeight: FontWeight.w700),
               ),
             ),
@@ -1906,172 +1889,265 @@ class _AnalyticsPageState extends State<AnalyticsPage> {
 }
 
 class SettingsPage extends StatelessWidget {
-  const SettingsPage({super.key});
+  SettingsPage({super.key});
+
   @override
-  Widget build(BuildContext context) => Scaffold(
-    body: ListView(
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 30),
-      children: [
-        const Text(
-          'YOUR WORKSPACE',
-          style: TextStyle(
-            color: vermilion,
-            fontSize: 10,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 1.5,
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: appPreferences,
+    builder: (context, _) => Scaffold(
+      body: ListView(
+        padding: EdgeInsets.fromLTRB(20, 24, 20, 30),
+        children: [
+          Text(
+            tx('YOUR WORKSPACE'),
+            style: TextStyle(
+              color: vermilion,
+              fontSize: 10,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 1.5,
+            ),
           ),
-        ),
-        const SizedBox(height: 5),
-        const Text(
-          'Settings',
-          style: TextStyle(
-            color: ledgerInk,
-            fontSize: 28,
-            fontWeight: FontWeight.w800,
-            letterSpacing: -.7,
+          SizedBox(height: 5),
+          Text(
+            tx('Settings'),
+            style: TextStyle(
+              color: ledgerInk,
+              fontSize: 28,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -.7,
+            ),
           ),
-        ),
-        const SizedBox(height: 5),
-        const Text(
-          'Your shop details and app preferences.',
-          style: TextStyle(color: ledgerMuted, fontSize: 13),
-        ),
-        const SizedBox(height: 20),
-        _LedgerCard(
-          child: Row(
-            children: [
-              Container(
-                width: 54,
-                height: 54,
-                decoration: BoxDecoration(
-                  color: ledgerInset,
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: Image.asset(
-                  'assets/vin.jpg',
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) =>
-                      const Icon(Icons.content_cut, color: vermilion),
-                ),
-              ),
-              const SizedBox(width: 14),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'GM TAILORS',
-                      style: TextStyle(
-                        color: ledgerInk,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: .8,
-                      ),
-                    ),
-                    SizedBox(height: 4),
-                    Text(
-                      'Morai, Chennai',
-                      style: TextStyle(color: ledgerMuted, fontSize: 12),
+          SizedBox(height: 5),
+          Text(
+            tx('Your shop details and app preferences.'),
+            style: TextStyle(color: ledgerMuted, fontSize: 13),
+          ),
+          SizedBox(height: 20),
+          _LedgerCard(
+            child: InkWell(
+              borderRadius: BorderRadius.circular(18),
+              onTap: () => showDialog<void>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: Text(tx('Shop details')),
+                  content: Text(
+                    'GM TAILORS\nPlot no 62, 3rd cross street, Bethel Garden, Anna Nagar, Morai, Chennai-55\n9043943533 · 9003770263\nGMtailor9021@gmail.com',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: Text(tx('Close')),
                     ),
                   ],
                 ),
               ),
-              const Icon(Icons.checkroom_outlined, color: ledgerTeal),
-            ],
+              child: Padding(
+                padding: EdgeInsets.all(4),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        color: ledgerInset,
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: Image.asset(
+                        'assets/gm_brand.png',
+                        fit: BoxFit.contain,
+                        errorBuilder: (_, _, _) =>
+                            Icon(Icons.storefront_outlined, color: vermilion),
+                      ),
+                    ),
+                    SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'GM TAILORS',
+                            style: TextStyle(
+                              color: ledgerInk,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: .8,
+                            ),
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            tx('Morai, Chennai'),
+                            style: TextStyle(color: ledgerMuted, fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(Icons.open_in_new, color: ledgerTeal, size: 19),
+                  ],
+                ),
+              ),
+            ),
           ),
-        ),
-        const SizedBox(height: 12),
-        _SettingsRow(
-          icon: Icons.translate,
-          title: 'Invoice language',
-          subtitle: 'Choose English or Tamil when creating each bill',
-        ),
-        _SettingsRow(
-          icon: Icons.storage_outlined,
-          title: 'Your bill records',
-          subtitle: 'Saved on this device and available in History',
-        ),
-        _SettingsRow(
-          icon: Icons.picture_as_pdf_outlined,
-          title: 'Bill template',
-          subtitle: 'Original GM Tailors invoice layout is preserved',
-        ),
-        const SizedBox(height: 16),
-        const Center(
-          child: Text(
-            'GM Tailors Bills  ·  Version 1.0.0',
-            style: TextStyle(color: ledgerMuted, fontSize: 11),
+          SizedBox(height: 12),
+          _SettingsSection(
+            icon: Icons.translate,
+            title: tx('App language'),
+            subtitle: tx('Change every screen to English or Tamil'),
+            child: SegmentedButton<String>(
+              segments: [
+                ButtonSegment(value: 'en', label: Text(tx('English'))),
+                ButtonSegment(value: 'ta', label: Text(tx('Tamil'))),
+              ],
+              selected: {appPreferences.language},
+              onSelectionChanged: (values) =>
+                  appPreferences.setLanguage(values.first),
+            ),
           ),
-        ),
-      ],
+          _SettingsSection(
+            icon: Icons.palette_outlined,
+            title: tx('Appearance'),
+            subtitle: tx('Choose a color theme'),
+            child: DropdownButtonFormField<String>(
+              initialValue: appPreferences.theme,
+              decoration: InputDecoration(isDense: true),
+              items: [
+                DropdownMenuItem(
+                  value: 'apple',
+                  child: Text(tx('Apple Light')),
+                ),
+                DropdownMenuItem(
+                  value: 'linen',
+                  child: Text(tx('Atelier Linen')),
+                ),
+                DropdownMenuItem(
+                  value: 'midnight',
+                  child: Text(tx('Midnight Ledger')),
+                ),
+              ],
+              onChanged: (value) {
+                if (value != null) appPreferences.setTheme(value);
+              },
+            ),
+          ),
+          _SettingsSection(
+            icon: Icons.file_present_outlined,
+            title: tx('Default bill file'),
+            subtitle: tx('Choose the default format for download and share'),
+            child: SegmentedButton<String>(
+              segments: [
+                ButtonSegment(
+                  value: 'image',
+                  icon: Icon(Icons.image_outlined),
+                  label: Text(tx('Image')),
+                ),
+                ButtonSegment(
+                  value: 'pdf',
+                  icon: Icon(Icons.picture_as_pdf_outlined),
+                  label: Text(tx('PDF')),
+                ),
+              ],
+              selected: {appPreferences.defaultFileType},
+              onSelectionChanged: (values) =>
+                  appPreferences.setDefaultFileType(values.first),
+            ),
+          ),
+          _SettingsSection(
+            icon: Icons.storage_outlined,
+            title: tx('Your bill records'),
+            subtitle: tx('Saved on this device and available in History'),
+          ),
+          _SettingsSection(
+            icon: Icons.receipt_long_outlined,
+            title: tx('Bill template'),
+            subtitle: tx('Original GM Tailors invoice layout is preserved'),
+          ),
+          SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: () async {
+              await appPreferences.setLanguage('en');
+              await appPreferences.setTheme('apple');
+              await appPreferences.setDefaultFileType('image');
+            },
+            icon: Icon(Icons.restart_alt),
+            label: Text(tx('Restore defaults')),
+          ),
+          SizedBox(height: 16),
+          Center(
+            child: Text(
+              'GM Tailors Bills  ·  Version 1.2.0',
+              style: TextStyle(color: ledgerMuted, fontSize: 11),
+            ),
+          ),
+        ],
+      ),
     ),
   );
 }
 
-class _SettingsRow extends StatelessWidget {
-  const _SettingsRow({
+class _SettingsSection extends StatelessWidget {
+  _SettingsSection({
     required this.icon,
     required this.title,
     required this.subtitle,
+    this.child,
   });
   final IconData icon;
   final String title, subtitle;
+  final Widget? child;
+
   @override
   Widget build(BuildContext context) => Container(
-    margin: const EdgeInsets.only(bottom: 9),
-    padding: const EdgeInsets.all(14),
+    margin: EdgeInsets.only(bottom: 10),
+    padding: EdgeInsets.all(15),
     decoration: BoxDecoration(
       color: ledgerSurface,
       border: Border.all(color: ledgerBorder),
-      borderRadius: BorderRadius.circular(15),
+      borderRadius: BorderRadius.circular(17),
     ),
-    child: Row(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: ledgerInset,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(icon, color: vermilion, size: 19),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  color: ledgerInk,
-                  fontWeight: FontWeight.w700,
-                ),
+        Row(
+          children: [
+            Icon(icon, color: vermilion, size: 20),
+            SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      color: ledgerInk,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  SizedBox(height: 3),
+                  Text(
+                    subtitle,
+                    style: TextStyle(color: ledgerMuted, fontSize: 12),
+                  ),
+                ],
               ),
-              const SizedBox(height: 3),
-              Text(
-                subtitle,
-                style: const TextStyle(color: ledgerMuted, fontSize: 11),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
+        if (child != null) ...[SizedBox(height: 14), child!],
       ],
     ),
   );
 }
 
 class _LedgerCard extends StatelessWidget {
-  const _LedgerCard({required this.child});
+  _LedgerCard({required this.child});
   final Widget child;
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(16),
+    padding: EdgeInsets.all(16),
     decoration: BoxDecoration(
       color: ledgerSurface,
       border: Border.all(color: ledgerBorder),
       borderRadius: BorderRadius.circular(17),
-      boxShadow: const [
+      boxShadow: [
         BoxShadow(
           color: Color(0x0A141B2D),
           blurRadius: 7,
@@ -2084,16 +2160,12 @@ class _LedgerCard extends StatelessWidget {
 }
 
 class _MetricMini extends StatelessWidget {
-  const _MetricMini({
-    required this.label,
-    required this.value,
-    required this.color,
-  });
+  _MetricMini({required this.label, required this.value, required this.color});
   final String label, value;
   final Color color;
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 10),
+    padding: EdgeInsets.symmetric(horizontal: 10),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2101,14 +2173,14 @@ class _MetricMini extends StatelessWidget {
           label,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
+          style: TextStyle(
             color: ledgerMuted,
             fontSize: 9,
             fontWeight: FontWeight.w700,
             letterSpacing: .7,
           ),
         ),
-        const SizedBox(height: 5),
+        SizedBox(height: 5),
         FittedBox(
           alignment: Alignment.centerLeft,
           fit: BoxFit.scaleDown,
@@ -2127,11 +2199,7 @@ class _MetricMini extends StatelessWidget {
 }
 
 class _DarkMetric extends StatelessWidget {
-  const _DarkMetric({
-    required this.label,
-    required this.value,
-    required this.dot,
-  });
+  _DarkMetric({required this.label, required this.value, required this.dot});
   final String label, value;
   final Color dot;
   @override
@@ -2139,34 +2207,34 @@ class _DarkMetric extends StatelessWidget {
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       Padding(
-        padding: const EdgeInsets.only(top: 4),
+        padding: EdgeInsets.only(top: 4),
         child: Container(
           width: 7,
           height: 7,
           decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
         ),
       ),
-      const SizedBox(width: 7),
+      SizedBox(width: 7),
       Expanded(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              label,
-              style: const TextStyle(
+              tx(label),
+              style: TextStyle(
                 color: Colors.white60,
                 fontSize: 8,
                 fontWeight: FontWeight.w700,
                 letterSpacing: .7,
               ),
             ),
-            const SizedBox(height: 4),
+            SizedBox(height: 4),
             FittedBox(
               alignment: Alignment.centerLeft,
               fit: BoxFit.scaleDown,
               child: Text(
                 value,
-                style: const TextStyle(
+                style: TextStyle(
                   color: Colors.white,
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
@@ -2181,7 +2249,7 @@ class _DarkMetric extends StatelessWidget {
 }
 
 class _SourceLegend extends StatelessWidget {
-  const _SourceLegend({
+  _SourceLegend({
     required this.label,
     required this.amount,
     required this.color,
@@ -2197,22 +2265,19 @@ class _SourceLegend extends StatelessWidget {
         height: 9,
         decoration: BoxDecoration(color: color, shape: BoxShape.circle),
       ),
-      const SizedBox(width: 7),
+      SizedBox(width: 7),
       Expanded(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              label,
-              style: const TextStyle(color: ledgerMuted, fontSize: 10),
-            ),
-            const SizedBox(height: 3),
+            Text(tx(label), style: TextStyle(color: ledgerMuted, fontSize: 10)),
+            SizedBox(height: 3),
             FittedBox(
               alignment: Alignment.centerLeft,
               fit: BoxFit.scaleDown,
               child: Text(
                 money.format(amount),
-                style: const TextStyle(
+                style: TextStyle(
                   color: ledgerInk,
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
@@ -2227,7 +2292,7 @@ class _SourceLegend extends StatelessWidget {
 }
 
 class _WeekRow extends StatelessWidget {
-  const _WeekRow({
+  _WeekRow({
     required this.label,
     required this.range,
     required this.value,
@@ -2244,13 +2309,13 @@ class _WeekRow extends StatelessWidget {
     onTap: onTap,
     borderRadius: BorderRadius.circular(10),
     child: Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
           SizedBox(
             width: 54,
             child: Text(
-              label,
+              tx(label),
               style: TextStyle(
                 color: active ? vermilion : ledgerInk,
                 fontSize: 11,
@@ -2262,11 +2327,8 @@ class _WeekRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  range,
-                  style: const TextStyle(color: ledgerMuted, fontSize: 9),
-                ),
-                const SizedBox(height: 4),
+                Text(range, style: TextStyle(color: ledgerMuted, fontSize: 9)),
+                SizedBox(height: 4),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(5),
                   child: LinearProgressIndicator(
@@ -2279,13 +2341,13 @@ class _WeekRow extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(width: 9),
+          SizedBox(width: 9),
           SizedBox(
             width: 85,
             child: Text(
               money.format(value),
               textAlign: TextAlign.right,
-              style: const TextStyle(
+              style: TextStyle(
                 color: ledgerInk,
                 fontSize: 10,
                 fontWeight: FontWeight.w700,
@@ -2299,7 +2361,7 @@ class _WeekRow extends StatelessWidget {
 }
 
 class _FilterChip extends StatelessWidget {
-  const _FilterChip({
+  _FilterChip({
     required this.label,
     required this.selected,
     required this.onTap,
@@ -2312,7 +2374,7 @@ class _FilterChip extends StatelessWidget {
     onTap: onTap,
     borderRadius: BorderRadius.circular(20),
     child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+      padding: EdgeInsets.symmetric(horizontal: 13, vertical: 8),
       decoration: BoxDecoration(
         color: selected ? ledgerInk : ledgerSurface,
         borderRadius: BorderRadius.circular(20),
@@ -2350,38 +2412,120 @@ Future<void> _editBill(BuildContext context, Bill bill) async {
   if (updated != null) await store.save(updated);
 }
 
-class BillPreview extends StatelessWidget {
-  const BillPreview({super.key, required this.bill});
+class BillPreview extends StatefulWidget {
+  BillPreview({super.key, required this.bill});
   final Bill bill;
+  @override
+  State<BillPreview> createState() => _BillPreviewState();
+}
+
+class _BillPreviewState extends State<BillPreview> {
+  final GlobalKey _billKey = GlobalKey();
+  late String fileType = appPreferences.defaultFileType;
+  bool busy = false;
+
+  Future<Uint8List> _imageBytes() async {
+    await WidgetsBinding.instance.endOfFrame;
+    final boundary =
+        _billKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
+    final image = await boundary.toImage(pixelRatio: 3);
+    final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+    image.dispose();
+    if (bytes == null)
+      throw StateError('Could not render this bill as an image');
+    return bytes.buffer.asUint8List();
+  }
+
+  Future<Uint8List> _fileBytes() =>
+      fileType == 'pdf' ? _billPdf(widget.bill) : _imageBytes();
+
+  Future<void> _download() async {
+    setState(() => busy = true);
+    try {
+      final bytes = await _fileBytes();
+      final isPdf = fileType == 'pdf';
+      final path = await FileSaver.instance.saveAs(
+        name:
+            'GM-Tailors-${widget.bill.customer.trim().replaceAll(RegExp(r'[^a-zA-Z0-9_-]+'), '-')}',
+        bytes: bytes,
+        fileExtension: isPdf ? 'pdf' : 'png',
+        mimeType: isPdf ? MimeType.pdf : MimeType.png,
+      );
+      if (!mounted || path == null) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('${tx('Saved to files')}: $path')));
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Could not save bill: $error')));
+      }
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
+  Future<void> _share() async {
+    setState(() => busy = true);
+    try {
+      final bytes = await _fileBytes();
+      final isPdf = fileType == 'pdf';
+      final filename =
+          'GM-Tailors-${widget.bill.customer.trim().replaceAll(RegExp(r'[^a-zA-Z0-9_-]+'), '-')}.${isPdf ? 'pdf' : 'png'}';
+      await SharePlus.instance.share(
+        ShareParams(
+          title: tx('Share bill'),
+          subject: filename,
+          files: [
+            XFile.fromData(
+              bytes,
+              mimeType: isPdf ? 'application/pdf' : 'image/png',
+              name: filename,
+            ),
+          ],
+        ),
+      );
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Could not share bill: $error')));
+      }
+    } finally {
+      if (mounted) setState(() => busy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) => DraggableScrollableSheet(
     initialChildSize: .92,
     maxChildSize: .97,
     builder: (context, sc) => Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFFF4F5F7),
+      decoration: BoxDecoration(
+        color: ledgerCanvas,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(16),
             child: Row(
               children: [
-                const Expanded(
+                Expanded(
                   child: Text(
-                    'Bill preview',
+                    tx('Bill preview'),
                     style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
                   ),
                 ),
                 IconButton(
-                  tooltip: 'Edit bill',
-                  onPressed: () => _editBill(context, bill),
-                  icon: const Icon(Icons.edit_outlined),
+                  tooltip: tx('Edit bill'),
+                  onPressed: () => _editBill(context, widget.bill),
+                  icon: Icon(Icons.edit_outlined),
                 ),
                 IconButton(
                   onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close),
+                  icon: Icon(Icons.close),
                 ),
               ],
             ),
@@ -2389,20 +2533,75 @@ class BillPreview extends StatelessWidget {
           Expanded(
             child: SingleChildScrollView(
               controller: sc,
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
-              child: InvoicePaper(bill: bill),
+              padding: EdgeInsets.fromLTRB(16, 0, 16, 20),
+              child: RepaintBoundary(
+                key: _billKey,
+                child: InvoicePaper(bill: widget.bill),
+              ),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
-            child: SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: FilledButton.icon(
-                onPressed: () => _printBill(bill),
-                icon: const Icon(Icons.download),
-                label: const Text('Download / Print PDF'),
-                style: FilledButton.styleFrom(backgroundColor: pink),
+          SafeArea(
+            top: false,
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(16, 8, 16, 14),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SegmentedButton<String>(
+                    segments: [
+                      ButtonSegment(
+                        value: 'image',
+                        icon: Icon(Icons.image_outlined),
+                        label: Text(tx('Image')),
+                      ),
+                      ButtonSegment(
+                        value: 'pdf',
+                        icon: Icon(Icons.picture_as_pdf_outlined),
+                        label: Text(tx('PDF')),
+                      ),
+                    ],
+                    selected: {fileType},
+                    onSelectionChanged: busy
+                        ? null
+                        : (values) => setState(() => fileType = values.first),
+                  ),
+                  SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: busy ? null : _share,
+                          icon: Icon(Icons.share_outlined),
+                          label: Text(tx('Share')),
+                        ),
+                      ),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: busy ? null : _download,
+                          icon: busy
+                              ? SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : Icon(Icons.download_outlined),
+                          label: Text(tx('Download')),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: vermilion,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  TextButton.icon(
+                    onPressed: busy ? null : () => _printBill(widget.bill),
+                    icon: Icon(Icons.print_outlined, size: 18),
+                    label: Text(tx('Print bill')),
+                  ),
+                ],
               ),
             ),
           ),
@@ -2413,21 +2612,21 @@ class BillPreview extends StatelessWidget {
 }
 
 class InvoicePaper extends StatelessWidget {
-  const InvoicePaper({super.key, required this.bill});
+  InvoicePaper({super.key, required this.bill});
   final Bill bill;
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(20),
+    padding: EdgeInsets.all(20),
     decoration: BoxDecoration(
       color: Colors.white,
-      boxShadow: const [
+      boxShadow: [
         BoxShadow(
           color: Color(0x17000000),
           blurRadius: 10,
           offset: Offset(0, 4),
         ),
       ],
-      border: Border.all(color: const Color(0xFFF4BDD0)),
+      border: Border.all(color: Color(0xFFF4BDD0)),
     ),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -2435,7 +2634,7 @@ class InvoicePaper extends StatelessWidget {
         Image.asset(
           'assets/vin.jpg',
           height: 48,
-          errorBuilder: (_, _, _) => const SizedBox(height: 10),
+          errorBuilder: (_, _, _) => SizedBox(height: 10),
         ),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -2443,10 +2642,10 @@ class InvoicePaper extends StatelessWidget {
             Image.asset(
               'assets/logo.png',
               height: 48,
-              errorBuilder: (_, _, _) => const SizedBox(),
+              errorBuilder: (_, _, _) => SizedBox(),
             ),
-            const SizedBox(width: 8),
-            const Text(
+            SizedBox(width: 8),
+            Text(
               'GM TAILORS',
               style: TextStyle(
                 color: pink,
@@ -2456,13 +2655,13 @@ class InvoicePaper extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 8),
-        const Text(
+        SizedBox(height: 8),
+        Text(
           'ஸ்ரீ முனிஸ்வரர் துணை\nPlot no 62, 3rd cross street, bethel garden, anna nagar, morai chennai-55\n9043943533, 9003770263 · GMtailor9021@gmail.com',
           textAlign: TextAlign.center,
           style: TextStyle(fontSize: 9, height: 1.5),
         ),
-        const SizedBox(height: 18),
+        SizedBox(height: 18),
         Text(
           bill.tamil ? 'வாடிக்கையாளர் விவரங்கள்' : 'Customer Details',
           style: TextStyle(
@@ -2471,18 +2670,18 @@ class InvoicePaper extends StatelessWidget {
             fontSize: 12,
           ),
         ),
-        const Divider(color: pink),
+        Divider(color: pink),
         Text('${bill.tamil ? 'பெயர்' : 'Name'}: ${bill.customer}'),
         Text('${bill.tamil ? 'தொலைபேசி எண்' : 'Phone'}: ${bill.phone}'),
         Text(
           DateFormat('dd MMM yyyy').format(bill.date),
           textAlign: TextAlign.right,
         ),
-        const SizedBox(height: 14),
+        SizedBox(height: 14),
         if (!bill.manual)
           Table(
-            border: TableBorder.all(color: const Color(0xFFF4BDD0)),
-            columnWidths: const {
+            border: TableBorder.all(color: Color(0xFFF4BDD0)),
+            columnWidths: {
               0: FixedColumnWidth(30),
               1: FlexColumnWidth(4),
               2: FixedColumnWidth(38),
@@ -2491,7 +2690,7 @@ class InvoicePaper extends StatelessWidget {
             },
             children: [
               TableRow(
-                decoration: const BoxDecoration(color: Color(0xFFFFF8FA)),
+                decoration: BoxDecoration(color: Color(0xFFFFF8FA)),
                 children:
                     (bill.tamil
                             ? ['வ.எண்', 'விவரம்', 'அளவு', 'விலை', 'தொகை']
@@ -2504,10 +2703,10 @@ class InvoicePaper extends StatelessWidget {
                               ])
                         .map(
                           (x) => Padding(
-                            padding: const EdgeInsets.all(5),
+                            padding: EdgeInsets.all(5),
                             child: Text(
                               x,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 8,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -2528,11 +2727,8 @@ class InvoicePaper extends StatelessWidget {
                           ]
                           .map(
                             (x) => Padding(
-                              padding: const EdgeInsets.all(5),
-                              child: Text(
-                                x,
-                                style: const TextStyle(fontSize: 8),
-                              ),
+                              padding: EdgeInsets.all(5),
+                              child: Text(x, style: TextStyle(fontSize: 8)),
                             ),
                           )
                           .toList(),
@@ -2542,35 +2738,35 @@ class InvoicePaper extends StatelessWidget {
           ),
         if (bill.manual)
           Text('${bill.tamil ? 'வருமானம்' : 'Manual income'} · ${bill.note}'),
-        const SizedBox(height: 10),
+        SizedBox(height: 10),
         Align(
           alignment: Alignment.centerRight,
           child: Text(
             '${bill.tamil ? 'மொத்தம்' : 'Total'}: ${money.format(bill.total)}',
-            style: const TextStyle(
+            style: TextStyle(
               fontWeight: FontWeight.w800,
               color: pink,
               fontSize: 14,
             ),
           ),
         ),
-        const Divider(color: pink),
+        Divider(color: pink),
         Text(
           '${bill.tamil ? 'வார்த்தைகளில்' : 'Rupees in words'}: ${_amountWords(bill.total, bill.tamil)}',
-          style: const TextStyle(fontSize: 9),
+          style: TextStyle(fontSize: 9),
         ),
         if (!bill.manual) ...[
-          const SizedBox(height: 22),
+          SizedBox(height: 22),
           Text(
             bill.tamil ? 'இணைய வழி பணம்:' : 'Online Payment:',
             style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: 8),
           Center(
             child: Image.asset(
               'assets/gpay.png',
               height: 115,
-              errorBuilder: (_, _, _) => const SizedBox(),
+              errorBuilder: (_, _, _) => SizedBox(),
             ),
           ),
         ],
@@ -2579,7 +2775,7 @@ class InvoicePaper extends StatelessWidget {
   );
 }
 
-Future<void> _printBill(Bill b) async {
+Future<Uint8List> _billPdf(Bill b) async {
   final doc = pw.Document();
   final tamilFont = pw.Font.ttf(
     await rootBundle.load('assets/fonts/NotoSansTamil.ttf'),
@@ -2593,13 +2789,13 @@ Future<void> _printBill(Bill b) async {
   doc.addPage(
     pw.Page(
       pageFormat: PdfPageFormat.a4,
-      margin: const pw.EdgeInsets.all(32),
+      margin: pw.EdgeInsets.all(32),
       theme: pw.ThemeData.withFont(base: tamilFont, bold: tamilFont),
       build: (_) => pw.Container(
         decoration: pw.BoxDecoration(
           border: pw.Border.all(color: PdfColor.fromHex('#F4BDD0')),
         ),
-        padding: const pw.EdgeInsets.all(22),
+        padding: pw.EdgeInsets.all(22),
         child: pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.stretch,
           children: [
@@ -2625,7 +2821,7 @@ Future<void> _printBill(Bill b) async {
               child: pw.Text(
                 'ஸ்ரீ முனிஸ்வரர் துணை\nPlot no 62, 3rd cross street, bethel garden, anna nagar, morai chennai-55\n9043943533, 9003770263 · GMtailor9021@gmail.com',
                 textAlign: pw.TextAlign.center,
-                style: const pw.TextStyle(fontSize: 8),
+                style: pw.TextStyle(fontSize: 8),
               ),
             ),
             pw.SizedBox(height: 18),
@@ -2685,7 +2881,7 @@ Future<void> _printBill(Bill b) async {
             pw.Divider(color: PdfColor.fromHex('#F4BDD0')),
             pw.Text(
               '${b.tamil ? 'வார்த்தைகளில்' : 'Rupees in words'}: ${_amountWords(b.total, b.tamil)}',
-              style: const pw.TextStyle(fontSize: 9),
+              style: pw.TextStyle(fontSize: 9),
             ),
             pw.Spacer(),
             if (!b.manual)
@@ -2705,7 +2901,11 @@ Future<void> _printBill(Bill b) async {
       ),
     ),
   );
-  await Printing.layoutPdf(onLayout: (_) async => doc.save());
+  return doc.save();
+}
+
+Future<void> _printBill(Bill b) async {
+  await Printing.layoutPdf(onLayout: (_) async => _billPdf(b));
 }
 
 String _amountWords(double v, bool tamil) {
