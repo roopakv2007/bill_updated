@@ -601,7 +601,7 @@ class BillTile extends StatelessWidget {
       ),
       title: Text(
         bill.customer.isEmpty
-            ? (bill.manual ? tx('Other income') : 'Customer')
+            ? (bill.manual ? tx('Other income') : tx('Customer'))
             : bill.customer,
         style: TextStyle(
           fontWeight: FontWeight.w700,
@@ -612,7 +612,7 @@ class BillTile extends StatelessWidget {
       subtitle: Padding(
         padding: EdgeInsets.only(top: 4),
         child: Text(
-          '${bill.manual ? 'Manual entry' : tx('Invoice')}  ·  ${DateFormat('d MMM yyyy').format(bill.date)}',
+          '${bill.manual ? tx('Manual entry') : tx('Invoice')}  ·  ${DateFormat('d MMM yyyy').format(bill.date)}',
           style: TextStyle(color: ledgerMuted, fontSize: 11),
         ),
       ),
@@ -2170,7 +2170,7 @@ class _MetricMini extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          label,
+          tx(label),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
@@ -2381,7 +2381,7 @@ class _FilterChip extends StatelessWidget {
         border: Border.all(color: selected ? ledgerInk : ledgerBorder),
       ),
       child: Text(
-        label,
+        tx(label),
         style: TextStyle(
           color: selected ? Colors.white : ledgerMuted,
           fontSize: 11,
