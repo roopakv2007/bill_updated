@@ -13,10 +13,12 @@ flutter pub get
 flutter run
 ```
 
-The app supports English/Tamil interface and invoice labels, adjustable item rows, the GM Tailors invoice layout, PDF preview/download, bill history with edit/delete, manual income entries, and month/week analysis charts. Bills are stored on the device using local preferences, so they work offline but do not sync to another device. Item descriptions and customer names are kept as entered; the language switch translates the interface and invoice labels, not free-text content.
+The app supports English/Tamil interface and invoice labels, adjustable item rows, the GM Tailors invoice layout, PDF preview/download, bill history with edit/delete, manual income entries, and month/week analysis charts. Bills are cached on the device and synced to the shared Supabase bill list, including realtime updates across app installs. Existing local bills are migrated the first time each install connects.
 
 ## Security
 
-No Supabase service-role secret or GitHub token is included in the app or repository. This app currently uses local storage; adding cloud sync requires a user sign-in and owner-scoped Row Level Security policies before uploading customer records.
+The app includes only the Supabase publishable key. The shared bill table intentionally allows anonymous read/write access to match the no-sign-in shared-data requirement. That means any app install or client using the public key can read, add, edit, and delete all customer bills; do not use this access model if the records must be private.
+
+The production schema is in `supabase/migrations/20261102090000_create_public_shared_bills.sql`.
 
 The bundled Noto Sans Tamil font and license are in `app/assets/fonts/`.

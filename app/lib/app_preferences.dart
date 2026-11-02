@@ -213,6 +213,12 @@ const _tamilTranslations = <String, String>{
   'Open shop details': 'கடை விவரங்களைத் திற',
   'Save preferences': 'விருப்பங்களைச் சேமி',
   'Your bill records': 'உங்கள் பில் பதிவுகள்',
+  'Shared bill sync': 'பொதுவான பில் ஒத்திசைவு',
+  'Bills sync across all app installs':
+      'அனைத்து சாதனங்களிலும் பில்கள் ஒத்திசைக்கப்படும்',
+  'Connected and synced': 'இணைக்கப்பட்டு ஒத்திசைக்கப்பட்டது',
+  'Waiting for connection': 'இணைப்புக்காக காத்திருக்கிறது',
+  'Sync now': 'இப்போது ஒத்திசை',
   'Saved on this device and available in History':
       'இந்த சாதனத்தில் சேமிக்கப்பட்டு வரலாற்றில் கிடைக்கும்',
   'Bill template': 'பில் வடிவம்',

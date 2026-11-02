@@ -44,4 +44,4 @@ jobs:
             app/build/app/outputs/flutter-apk/app-arm64-v8a-release.apk \
             app/build/app/outputs/flutter-apk/app-x86_64-release.apk \
             --title "GM Tailors Bills $RELEASE_TAG" \
-            --notes "Updated branding, themes, Tamil app language, app settings, and bill image/PDF download and sharing. The invoice template is preserved."
+            --notes "Bills now sync to one shared Supabase list across app installs, with local bill migration and realtime updates. No sign-in is required: every install can read, add, edit, and delete all shared bills. The GM Tailors invoice template is preserved."

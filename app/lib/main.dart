@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:math' show Random;
 import 'dart:ui' as ui;
 
 import 'package:fl_chart/fl_chart.dart';
@@ -13,6 +15,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app_preferences.dart';
 
@@ -90,16 +93,42 @@ class Bill {
 
 class BillStore extends ChangeNotifier {
   List<Bill> bills = [];
+  static const _billsKey = 'gm_bills';
+  static const _pendingKey = 'gm_cloud_pending_ops';
+  static const _migrationKey = 'gm_cloud_local_migration_v1';
+  static const _table = 'gm_shared_bills';
+  final List<Map<String, dynamic>> _pendingOps = [];
+  StreamSubscription<List<Map<String, dynamic>>>? _changes;
+  Timer? _retryTimer;
+  bool syncAvailable = false;
+  bool _syncing = false;
+  bool _flushing = false;
+
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
     try {
-      bills = (jsonDecode(prefs.getString('gm_bills') ?? '[]') as List)
+      bills = (jsonDecode(prefs.getString(_billsKey) ?? '[]') as List)
           .map((e) => Bill.fromJson(Map<String, dynamic>.from(e)))
           .toList();
     } catch (_) {
       bills = [];
     }
+    try {
+      _pendingOps
+        ..clear()
+        ..addAll(
+          (jsonDecode(prefs.getString(_pendingKey) ?? '[]') as List).map(
+            (e) => Map<String, dynamic>.from(e),
+          ),
+        );
+    } catch (_) {
+      _pendingOps.clear();
+    }
     notifyListeners();
+    unawaited(_syncFromCloud());
+    _retryTimer ??= Timer.periodic(const Duration(seconds: 30), (_) {
+      if (!syncAvailable) unawaited(_syncFromCloud());
+    });
   }
 
   Future<void> save(Bill bill) async {
@@ -109,27 +138,172 @@ class BillStore extends ChangeNotifier {
     } else {
       bills[i] = bill;
     }
-    await _persist();
+    _queueOperation({'type': 'upsert', 'id': bill.id, 'bill': bill.toJson()});
+    await _persistPending();
+    await _persistCache();
+    unawaited(_flushPending());
   }
 
   Future<void> remove(Bill bill) async {
     bills.removeWhere((b) => b.id == bill.id);
-    await _persist();
+    _queueOperation({'type': 'delete', 'id': bill.id});
+    await _persistPending();
+    await _persistCache();
+    unawaited(_flushPending());
   }
 
-  Future<void> _persist() async {
+  Future<void> syncNow() => _syncFromCloud();
+
+  void _queueOperation(Map<String, dynamic> operation) {
+    _pendingOps.removeWhere((existing) => existing['id'] == operation['id']);
+    _pendingOps.add(operation);
+  }
+
+  Future<void> _persistCache() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(
-      'gm_bills',
+      _billsKey,
       jsonEncode(bills.map((e) => e.toJson()).toList()),
     );
     notifyListeners();
+  }
+
+  Future<void> _persistPending() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_pendingKey, jsonEncode(_pendingOps));
+  }
+
+  Map<String, dynamic> _cloudRow(Bill bill) => {
+    'id': bill.id,
+    'bill': bill.toJson(),
+    'issued_at': bill.date.toUtc().toIso8601String(),
+  };
+
+  List<Bill> _decodeRows(List<Map<String, dynamic>> rows) => rows
+      .map(
+        (row) => Bill.fromJson(Map<String, dynamic>.from(row['bill'] as Map)),
+      )
+      .toList();
+
+  Future<void> _syncFromCloud() async {
+    if (_syncing) return;
+    _syncing = true;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      var rows = await Supabase.instance.client.from(_table).select();
+      var remote = _decodeRows(List<Map<String, dynamic>>.from(rows));
+
+      // Each device contributes legacy local bills once. Existing cloud records
+      // win on an ID collision, so reopening an older phone cannot overwrite a
+      // newer shared edit.
+      if (!(prefs.getBool(_migrationKey) ?? false)) {
+        final remoteIds = remote.map((bill) => bill.id).toSet();
+        final localOnly = bills.where((bill) => !remoteIds.contains(bill.id));
+        final migrationRows = localOnly.map(_cloudRow).toList();
+        if (migrationRows.isNotEmpty) {
+          await Supabase.instance.client
+              .from(_table)
+              .upsert(migrationRows, onConflict: 'id');
+        }
+        await prefs.setBool(_migrationKey, true);
+        rows = await Supabase.instance.client.from(_table).select();
+        remote = _decodeRows(List<Map<String, dynamic>>.from(rows));
+      }
+
+      await _flushPending();
+      rows = await Supabase.instance.client.from(_table).select();
+      remote = _decodeRows(List<Map<String, dynamic>>.from(rows));
+      await _applyCloudSnapshot(remote);
+      syncAvailable = _pendingOps.isEmpty;
+      notifyListeners();
+      _listenForChanges();
+    } catch (_) {
+      syncAvailable = false;
+      notifyListeners();
+    } finally {
+      _syncing = false;
+    }
+  }
+
+  Future<void> _flushPending() async {
+    if (_pendingOps.isEmpty || _flushing) return;
+    _flushing = true;
+    try {
+      final client = Supabase.instance.client;
+      while (_pendingOps.isNotEmpty) {
+        final operation = _pendingOps.first;
+        if (operation['type'] == 'delete') {
+          await client.from(_table).delete().eq('id', operation['id']);
+        } else {
+          final bill = Bill.fromJson(
+            Map<String, dynamic>.from(operation['bill'] as Map),
+          );
+          await client.from(_table).upsert(_cloudRow(bill), onConflict: 'id');
+        }
+        _pendingOps.remove(operation);
+        await _persistPending();
+      }
+      syncAvailable = true;
+    } catch (_) {
+      syncAvailable = false;
+      await _persistPending();
+    } finally {
+      _flushing = false;
+    }
+    notifyListeners();
+  }
+
+  Future<void> _applyCloudSnapshot(List<Bill> remote) async {
+    final byId = {for (final bill in remote) bill.id: bill};
+    for (final operation in _pendingOps) {
+      final id = operation['id'] as String;
+      if (operation['type'] == 'delete') {
+        byId.remove(id);
+      } else {
+        byId[id] = Bill.fromJson(
+          Map<String, dynamic>.from(operation['bill'] as Map),
+        );
+      }
+    }
+    bills = byId.values.toList()..sort((a, b) => b.date.compareTo(a.date));
+    await _persistCache();
+  }
+
+  void _listenForChanges() {
+    if (_changes != null) return;
+    _changes = Supabase.instance.client
+        .from(_table)
+        .stream(primaryKey: ['id'])
+        .order('issued_at', ascending: false)
+        .listen(
+          (rows) async {
+            await _applyCloudSnapshot(
+              _decodeRows(List<Map<String, dynamic>>.from(rows)),
+            );
+            syncAvailable = _pendingOps.isEmpty;
+            notifyListeners();
+          },
+          onError: (_) {
+            _changes = null;
+            syncAvailable = false;
+            notifyListeners();
+          },
+          onDone: () {
+            _changes = null;
+            syncAvailable = false;
+            notifyListeners();
+          },
+        );
   }
 }
 
 final store = BillStore();
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Supabase.initialize(
+    url: 'https://rxpttkxstwexnrcyjsez.supabase.co',
+    publishableKey: 'sb_publishable_rwEVYOStb9zw9n-bilQAMg_d6FBa1p0',
+  );
   await appPreferences.load();
   await store.load();
   runApp(GmApp());
@@ -947,7 +1121,7 @@ class _BillEditorState extends State<BillEditor> {
                 Bill(
                   id:
                       widget.initial?.id ??
-                      DateTime.now().microsecondsSinceEpoch.toString(),
+                      '${DateTime.now().microsecondsSinceEpoch}-${Random.secure().nextInt(0x7fffffff).toRadixString(16)}',
                   customer: name.text.trim(),
                   phone: phone.text.trim(),
                   date: widget.initial?.date ?? DateTime.now(),
@@ -2051,9 +2225,39 @@ class SettingsPage extends StatelessWidget {
             ),
           ),
           _SettingsSection(
-            icon: Icons.storage_outlined,
-            title: tx('Your bill records'),
-            subtitle: tx('Saved on this device and available in History'),
+            icon: Icons.cloud_sync_outlined,
+            title: tx('Shared bill sync'),
+            subtitle: tx('Bills sync across all app installs'),
+            child: AnimatedBuilder(
+              animation: store,
+              builder: (context, _) => Row(
+                children: [
+                  Icon(
+                    store.syncAvailable
+                        ? Icons.cloud_done_outlined
+                        : Icons.cloud_off_outlined,
+                    size: 18,
+                    color: store.syncAvailable ? ledgerTeal : vermilion,
+                  ),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      tx(
+                        store.syncAvailable
+                            ? 'Connected and synced'
+                            : 'Waiting for connection',
+                      ),
+                      style: TextStyle(color: ledgerMuted, fontSize: 12),
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: store.syncNow,
+                    icon: Icon(Icons.sync, size: 16),
+                    label: Text(tx('Sync now')),
+                  ),
+                ],
+              ),
+            ),
           ),
           _SettingsSection(
             icon: Icons.receipt_long_outlined,
@@ -2073,7 +2277,7 @@ class SettingsPage extends StatelessWidget {
           SizedBox(height: 16),
           Center(
             child: Text(
-              'GM Tailors Bills  ·  Version 1.2.0',
+              'GM Tailors Bills  ·  Version 1.2.3',
               style: TextStyle(color: ledgerMuted, fontSize: 11),
             ),
           ),
